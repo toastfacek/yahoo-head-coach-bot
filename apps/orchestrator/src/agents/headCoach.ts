@@ -56,9 +56,13 @@ export async function runHeadCoach({ leagueId, userId, intent }:{
           inputSchema: z.object({ leagueId: z.string() }),
           execute: ({ leagueId }) => scout({ leagueId })
         }),
-        analyst: tool({
-          description: 'Turn signals + roster into lineup & waiver plans with confidence.',
-          inputSchema: z.object({ leagueId: z.string(), window: z.string().optional() }),
+      analyst: tool({
+          description: 'Turn signals + roster into lineup & waiver plans with confidence. Prefer passing prior scout() output as { scout } to avoid re-fetching.',
+          inputSchema: z.object({
+            leagueId: z.string(),
+            window: z.string().optional(),
+            scout: z.any().optional()
+          }),
           execute: (i) => analyze(i)
         }),
         executor: tool({

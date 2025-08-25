@@ -1,8 +1,19 @@
-// Stub for historian tool - to be implemented in Phase 3
-export async function record(input: any) {
-  console.log('Historian tool called with:', input);
-  return {
-    recorded: true,
-    message: 'This is a stub recording. Will be implemented in Phase 3.'
-  };
+import { prisma } from '../db';
+
+export async function record(input: { leagueId: string; payload: any }) {
+  try {
+    const { leagueId, payload } = input;
+    const entry = await prisma.signal.create({
+      data: {
+        leagueId,
+        kind: 'report',
+        payload: payload as any,
+        source: 'headcoach',
+      },
+    });
+    return { recorded: true, id: entry.id };
+  } catch (err: any) {
+    console.error('Historian error:', err);
+    return { recorded: false, error: err?.message || 'record_failed' };
+  }
 }
