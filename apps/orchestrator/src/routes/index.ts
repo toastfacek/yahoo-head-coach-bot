@@ -5,6 +5,7 @@ import { oauthStart, oauthCallback, tokenStatus, refreshNow } from './oauth';
 import { checkLineup } from './lineup';
 import { runWaivers } from './waivers';
 import { listPending, approve, reject } from './approvals';
+import { hourly } from './scheduler';
 
 const router = Router();
 
@@ -29,6 +30,9 @@ router.get('/approvals/pending', listPending);
 router.post('/approvals/approve', approve);
 router.post('/approvals/reject', reject);
 
+// Scheduler endpoint (hourly cron target)
+router.get('/scheduler/hourly', hourly);
+
 // Root endpoint
 router.get('/', (req, res) => {
   res.json({
@@ -43,6 +47,9 @@ router.get('/', (req, res) => {
       reports: '/reports/daily',
       lineup: '/lineup/check',
       waivers: '/waivers/run',
+      scheduler: {
+        hourly: '/scheduler/hourly'
+      },
       approvals: {
         pending: '/approvals/pending',
         approve: '/approvals/approve',
