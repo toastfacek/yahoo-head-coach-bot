@@ -15,7 +15,7 @@
 - Prisma client/migrate: `cd packages/data && npx prisma generate && npx prisma migrate dev`
 
 ## Configuration & Security
-- Copy env: `cp apps/orchestrator/env.example apps/orchestrator/.env` and set `DATABASE_URL`, `ALLOWED_ORIGINS`, Yahoo OAuth keys, `ANTHROPIC_API_KEY`, and `AI_MODEL`.
+- Copy env: `cp apps/orchestrator/env.example apps/orchestrator/.env` and set `DATABASE_URL`, `ALLOWED_ORIGINS`, Yahoo OAuth keys, `ANTHROPIC_API_KEY`, `AI_MODEL`, and `EXECUTION_MODE`.
 - Never commit secrets. Respect CORS in `ALLOWED_ORIGINS` to match your UI host.
 
 ## Coding Style & Naming
@@ -26,6 +26,11 @@
 ## AI Configuration
 - SDK: Vercel AI SDK (`ai`) with Anthropic provider (`@ai-sdk/anthropic`).
 - Model: configured in `apps/orchestrator/src/ai.ts`; override with `AI_MODEL`.
+
+## Execution Modes
+- `stage`: stage all recommendations in DB (default).
+- `dry-run`: compute results without writing to DB.
+- `live`: attempt execution for auto-eligible actions when league is post-draft.
 
 ## Testing Guidelines
 - No test suite yet. Prefer: Jest/Vitest for TypeScript; Pytest for the Streamlit helpers.

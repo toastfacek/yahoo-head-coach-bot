@@ -3,21 +3,19 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import router from './routes';
+import { env, allowedOrigins } from './config/env';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(env.PORT || 3000);
 
 // Security middleware
 app.use(helmet());
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:8501'],
-  credentials: true
-}));
+app.use(cors({ origin: allowedOrigins(), credentials: true }));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -58,7 +56,7 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 const server = app.listen(PORT, () => {
   console.log(`🚀 HeadCoach Orchestrator server running on port ${PORT}`);
   console.log(`📊 Health check available at: http://localhost:${PORT}/api/health`);
-  console.log(`📈 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📈 Environment: ${env.NODE_ENV} | Model: ${env.AI_MODEL} | Mode: ${env.EXECUTION_MODE}`);
 });
 
 // Handle graceful shutdown
