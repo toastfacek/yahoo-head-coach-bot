@@ -44,6 +44,11 @@ function buildSystem(): string {
     '### Lineup — recommended swaps with reasons and confidence',
     '### Waivers — suggested adds/drops with FAB guidance',
     '### Notes — assumptions, missing data, next steps',
+    '',
+    'Example: Weekly Summary tool usage',
+    '- recall({ leagueId, kinds:["weekly_goal","todo"], includeRecommendations:true, includeDecisions:true, limit:5 })',
+    '- After forming a goal: historian({ leagueId, kind:"weekly_goal", payload:{ goal:"Win Week X matchup by optimizing RB efficiency" } })',
+    '- For each todo: historian({ leagueId, kind:"todo", payload:{ item:"Start Player A over Player B in FLEX", status:"open" } })',
   ].join('\n');
 }
 
