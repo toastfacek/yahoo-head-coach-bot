@@ -17,8 +17,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Type check (orchestrator)
-        run: npm run -w @yahoo-fantasy-bot/orchestrator build
+      - name: Type check (orchestrator, no emit)
+        run: npx tsc -p apps/orchestrator/tsconfig.json --noEmit
         env:
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
           YAHOO_CLIENT_ID: dummy
@@ -33,4 +33,3 @@ jobs:
         run: npm run -w @yahoo-fantasy-bot/orchestrator lint
       - name: Prettier check (orchestrator)
         run: npm run -w @yahoo-fantasy-bot/orchestrator format:check
-
