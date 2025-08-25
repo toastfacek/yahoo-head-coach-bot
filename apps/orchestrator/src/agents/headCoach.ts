@@ -11,6 +11,7 @@ import { scout } from '../tools/scout';
 import { analyze } from '../tools/analyst';
 import { proposeOrExecute } from '../tools/executor';
 import { record } from '../tools/historian';
+import { recall } from '../tools/recall';
 
 // Build the system prompt once per run with live policy/mode values
 function buildSystem(): string {
@@ -48,7 +49,7 @@ function buildSystem(): string {
 
 export async function runHeadCoach({ leagueId, userId, intent }:{
   leagueId: string; userId: string;
-  intent: 'DAILY_REPORT'|'WEEKLY_WAIVERS'|'LINEUP_CHECK'|'ON_DEMAND';
+  intent: 'DAILY_REPORT'|'WEEKLY_WAIVERS'|'LINEUP_CHECK'|'ON_DEMAND'|'WEEKLY_SUMMARY';
 }) {
   // Compose the final system prompt with current policy + mode
   const system = buildSystem();
@@ -59,9 +60,15 @@ export async function runHeadCoach({ leagueId, userId, intent }:{
       model,
       system,
       messages: [
-        { role: 'user', content: `Intent=${intent}; leagueId=${leagueId}; userId=${userId}. Produce a concise Markdown report and follow the tool choreography.` }
+        { role: 'user', content: buildUserInstruction({ intent, leagueId, userId }) }
       ],
       tools: {
+        // Fetch recent memory (last reports/goals/todos) to inform planning and progress checks
+        recall: tool({
+          description: 'Recall recent memory and recommendations to ground planning and progress checks.',
+          inputSchema: z.object({ leagueId: z.string(), kinds: z.array(z.string()).optional(), includeRecommendations: z.boolean().optional(), includeDecisions: z.boolean().optional(), limit: z.number().int().min(1).max(50).optional() }),
+          execute: (i) => recall(i as any)
+        }),
         // Collect signals (uses Yahoo reads)
         scout: tool({
           description: 'Collect signals (news/injuries/sentiment/vegas/weather).',
@@ -87,7 +94,7 @@ export async function runHeadCoach({ leagueId, userId, intent }:{
         // Persist an audit trail of the run
         historian: tool({
           description: 'Persist recommendations/decisions for audit & learning.',
-          inputSchema: z.object({ leagueId: z.string(), payload: z.any() }),
+          inputSchema: z.object({ leagueId: z.string(), payload: z.any(), kind: z.string().optional() }),
           execute: (i) => record(i)
         })
       }
@@ -96,4 +103,20 @@ export async function runHeadCoach({ leagueId, userId, intent }:{
     console.error('HeadCoach agent error:', err);
     throw err;
   }
+}
+
+function buildUserInstruction({ intent, leagueId, userId }:{ intent:string; leagueId:string; userId:string }) {
+  if (intent === 'WEEKLY_SUMMARY') {
+    return [
+      `Intent=${intent}; leagueId=${leagueId}; userId=${userId}.`,
+      'Goals:',
+      '- Recall last weekly goal and todos (if any).',
+      '- Assess progress. Generate a clear weekly goal (one sentence).',
+      '- Propose concrete todos for the coming week (3–5 items).',
+      '- Use historian(kind="weekly_goal"|"todo") to persist goal/todos.',
+      'Output: Summary, Goal, Todos, Notes (concise, Markdown).'
+    ].join('\n');
+  }
+
+  return `Intent=${intent}; leagueId=${leagueId}; userId=${userId}. Produce a concise Markdown report and follow the tool choreography.`;
 }

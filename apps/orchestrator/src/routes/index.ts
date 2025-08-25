@@ -5,6 +5,7 @@ import { oauthStart, oauthCallback, tokenStatus, refreshNow } from './oauth';
 import { checkLineup } from './lineup';
 import { runWaivers } from './waivers';
 import { listPending, approve, reject } from './approvals';
+import { weeklySummary } from './memory';
 import { hourly } from './scheduler';
 
 const router = Router();
@@ -33,6 +34,9 @@ router.post('/approvals/reject', reject);
 // Scheduler endpoint (hourly cron target)
 router.get('/scheduler/hourly', hourly);
 
+// Memory endpoints
+router.get('/memory/weekly', weeklySummary);
+
 // Root endpoint
 router.get('/', (req, res) => {
   res.json({
@@ -49,6 +53,9 @@ router.get('/', (req, res) => {
       waivers: '/waivers/run',
       scheduler: {
         hourly: '/scheduler/hourly'
+      },
+      memory: {
+        weekly: '/memory/weekly'
       },
       approvals: {
         pending: '/approvals/pending',
