@@ -180,7 +180,13 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
  */
 export async function tokenStatus(req: Request, res: Response): Promise<void> {
   try {
-    const userId = String((req.query as any).userId || 'dev');
+    const Query = z.object({ userId: z.string().optional() });
+    const parsed = Query.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
+      return;
+    }
+    const userId = String(parsed.data.userId || 'dev');
     const tok = await prisma.yahooToken.findUnique({ where: { userId } });
     if (!tok) {
       res.json({ userId, hasToken: false });
@@ -206,7 +212,13 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
  */
 export async function refreshNow(req: Request, res: Response): Promise<void> {
   try {
-    const userId = String((req.query as any).userId || 'dev');
+    const Query = z.object({ userId: z.string().optional() });
+    const parsed = Query.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
+      return;
+    }
+    const userId = String(parsed.data.userId || 'dev');
     await refreshToken(userId);
     const tok = await prisma.yahooToken.findUnique({ where: { userId } });
     res.json({ ok: true, userId, expiresAt: tok?.expiresAt?.toISOString() });
