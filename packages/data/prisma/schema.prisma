@@ -1,0 +1,106 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id         String      @id @default(cuid())
+  email      String?     @unique
+  yahooToken YahooToken?
+  leagues    LeagueUser[]
+  createdAt  DateTime    @default(now())
+}
+
+model YahooToken {
+  userId       String   @id
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  tokenType    String
+  scope        String?
+  user         User     @relation(fields: [userId], references: [id])
+  updatedAt    DateTime @updatedAt
+}
+
+model League {
+  id         String   @id
+  name       String
+  sport      String
+  season     Int
+  teams      Team[]
+  members    LeagueUser[]
+  snapshots  LeagueSnapshot[]
+}
+
+model LeagueUser {
+  id       String @id @default(cuid())
+  leagueId String
+  userId   String
+  role     String
+  league   League @relation(fields: [leagueId], references: [id])
+  user     User   @relation(fields: [userId], references: [id])
+  @@unique([leagueId, userId])
+}
+
+model Team {
+  id           String @id
+  leagueId     String
+  name         String
+  fabRemaining Int
+  rosterJson   Json
+  league       League @relation(fields:[leagueId], references:[id])
+}
+
+model Signal {
+  id       String   @id @default(cuid())
+  leagueId String
+  kind     String   // injury | news | sentiment | vegas | weather
+  payload  Json
+  asOf     DateTime @default(now())
+  source   String
+}
+
+model Recommendation {
+  id           String   @id @default(cuid())
+  leagueId     String
+  type         String   // LINEUP_SWAP | WAIVER
+  summary      String
+  payload      Json
+  confidence   Float
+  fabBid       Int?
+  autoEligible Boolean  @default(false)
+  status       String   @default("STAGED") // STAGED|EXECUTED|REJECTED
+  createdAt    DateTime @default(now())
+}
+
+model Decision {
+  id                String   @id @default(cuid())
+  recommendationId  String
+  action            String   // APPROVE|REJECT|AUTO_EXECUTE
+  actorUserId       String?
+  executedAt        DateTime?
+  result            Json?
+}
+
+model LeagueSnapshot {
+  id         String   @id @default(cuid())
+  leagueId   String
+  week       Int
+  rosterJson Json
+  createdAt  DateTime @default(now())
+  league     League   @relation(fields: [leagueId], references: [id])
+}
+
+model CostLog {
+  id               String   @id @default(cuid())
+  model            String
+  promptTokens     Int
+  completionTokens Int
+  costUsd          Float
+  context          String?
+  createdAt        DateTime @default(now())
+}
