@@ -1,7 +1,11 @@
+// Yahoo service helpers
+// - Wrap the yahoo-fantasy client with token refresh persistence
+// - Provide small utilities to derive keys and check league state
 import { prisma } from '../db';
 import YahooFantasy from 'yahoo-fantasy';
 import { env } from '../config/env';
 
+// Build a YahooFantasy client for a given user and persist refreshed tokens
 export async function yfForUser(userId: string) {
   const tok = await prisma.yahooToken.findUnique({ where: { userId } });
   if (!tok) throw new Error('Missing Yahoo token for user');
@@ -32,15 +36,18 @@ export async function yfForUser(userId: string) {
   return yf as any;
 }
 
+// Resolve numeric → game_key (e.g., nfl)
 export async function getGameKey(yf: any, code = 'nfl'): Promise<string> {
   const meta = await yf.game.meta(code);
   return String(meta.game_key);
 }
 
+// Compose Yahoo league key from game + league id
 export function leagueKeyFor(gameKey: string, leagueId: string | number) {
   return `${gameKey}.l.${leagueId}`;
 }
 
+// Find the authenticated user's team in this league
 export async function userTeamKey(yf: any, gameKey: string, leagueKey: string): Promise<string | null> {
   const user = await yf.user.game_teams(gameKey);
   const teams = user.teams || [];
@@ -48,6 +55,7 @@ export async function userTeamKey(yf: any, gameKey: string, leagueKey: string): 
   return team ? String(team.team_key) : null;
 }
 
+// Check whether league has completed its draft
 export async function isLeaguePostDraft(yf: any, leagueKey: string): Promise<boolean> {
   const meta = await yf.league.meta(leagueKey);
   const draftStatus = (meta?.draft_status || meta?.league?.draft_status || '').toLowerCase();

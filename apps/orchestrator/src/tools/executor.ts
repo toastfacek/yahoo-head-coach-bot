@@ -1,3 +1,9 @@
+// Executor tool: stage or execute actions depending on policy + EXECUTION_MODE
+// Flow:
+// - Below stageMin -> skip
+// - Stage recommendation in DB
+// - If EXECUTION_MODE=live and autoEligible -> attempt execution (post-draft only)
+// - If EXECUTION_MODE=dry-run -> mark as DRY_RUN
 import { prisma } from '../db';
 import { shouldAutoExecute } from '../guards/shouldExecute';
 import { POLICY } from '../config/policy';
@@ -51,6 +57,7 @@ export async function proposeOrExecute({ leagueId, userId, actions }:{
     });
 
     // Optional live execution if: eligible, mode=live, and league is postdraft
+    // Live execution attempt (post-draft only)
     if (autoEligible && env.EXECUTION_MODE === 'live') {
       try {
         const yf = await yfForUser(userId);
@@ -66,6 +73,7 @@ export async function proposeOrExecute({ leagueId, userId, actions }:{
           results.push({ id: rec.id, status: 'STAGED', autoEligible, note: 'team_key_not_found' });
           continue;
         }
+        // Placeholder: callYahoo is a stub until we wire write endpoints
         const execRes = await callYahoo({ leagueKey, teamKey, action: a });
         if (execRes?.success) {
           await prisma.recommendation.update({ where: { id: rec.id }, data: { status: 'EXECUTED' } });

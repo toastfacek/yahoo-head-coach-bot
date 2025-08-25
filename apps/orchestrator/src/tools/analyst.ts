@@ -1,7 +1,13 @@
+// Analyst tool: turn signals/roster into normalized actions with confidence
+// Strategy (MVP):
+// - Prefer the roster provided by scout() to avoid re-fetching
+// - Heuristic lineup suggestions based on injury status + position eligibility
+// - Confidence tiers: OUT (0.90), Doubtful (0.82), Questionable (0.70)
 import { yfForUser, getGameKey, leagueKeyFor, userTeamKey } from '../services/yahoo';
 
 type AnalystInput = { leagueId: string; userId?: string; window?: string; scout?: any };
 
+// Map common flex slots to eligible base positions
 const FLEX_MAP: Record<string, string[]> = {
   'W/R/T': ['WR', 'RB', 'TE'],
   'WR/RB': ['WR', 'RB'],
@@ -9,6 +15,7 @@ const FLEX_MAP: Record<string, string[]> = {
   'FLEX': ['WR', 'RB', 'TE'],
 };
 
+// Can a player with eligible positions fill a lineup slot (including flex rules)?
 function canFill(slot: string, eligible: string[]): boolean {
   if (!slot) return false;
   if (eligible.includes(slot)) return true;
@@ -39,12 +46,13 @@ export async function analyze(input: AnalystInput) {
 
   roster = Array.isArray(roster) ? roster : [];
 
-  // Partition starters vs bench
+  // Partition starters vs bench (Yahoo marks bench as BN)
   const starters = roster.filter((p: any) => p.selected_position && p.selected_position !== 'BN');
   const bench = roster.filter((p: any) => !p.selected_position || p.selected_position === 'BN');
 
   const actions: any[] = [];
 
+  // Basic injury flags used for heuristics
   const isOut = (s?: string) => /^(O|OUT|IR|PUP|NFI|SUSP)$/i.test(s || '');
   const isDoubtful = (s?: string) => /^(D|Doubtful)$/i.test(s || '');
   const isQuestionable = (s?: string) => /^(Q|Questionable)$/i.test(s || '');
@@ -56,6 +64,7 @@ export async function analyze(input: AnalystInput) {
       (bp: any) => Array.isArray(bp.eligible_positions) && canFill(slot, bp.eligible_positions)
     );
 
+    // OUT -> strong swap recommendation
     if (isOut(status) && benchCandidates.length > 0) {
       const bp = benchCandidates[0];
       actions.push({
@@ -69,6 +78,7 @@ export async function analyze(input: AnalystInput) {
       continue;
     }
 
+    // Doubtful -> medium-high recommendation
     if (isDoubtful(status) && benchCandidates.length > 0) {
       const bp = benchCandidates[0];
       actions.push({
@@ -82,6 +92,7 @@ export async function analyze(input: AnalystInput) {
       continue;
     }
 
+    // Questionable -> soft recommendation (monitor)
     if (isQuestionable(status) && benchCandidates.length > 0) {
       const bp = benchCandidates[0];
       actions.push({
@@ -96,6 +107,7 @@ export async function analyze(input: AnalystInput) {
     }
   }
 
+  // Return a human-readable analysis + normalized recommendations array
   return {
     analysis: `Evaluated ${starters.length} starters against ${bench.length} bench candidates. Found ${actions.length} lineup swaps.`,
     recommendations: actions,

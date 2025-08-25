@@ -1,8 +1,10 @@
+// Historian tool: persist a record of an agent run for audit/tracing
 import { prisma } from '../db';
 
 export async function record(input: { leagueId: string; payload: any }) {
   try {
     const { leagueId, payload } = input;
+    // Persist a generic 'report' signal so we can trace what was said/decided
     const entry = await prisma.signal.create({
       data: {
         leagueId,
