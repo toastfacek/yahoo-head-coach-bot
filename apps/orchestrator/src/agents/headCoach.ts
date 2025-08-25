@@ -49,6 +49,13 @@ function buildSystem(): string {
     '- recall({ leagueId, kinds:["weekly_goal","todo"], includeRecommendations:true, includeDecisions:true, limit:5 })',
     '- After forming a goal: historian({ leagueId, kind:"weekly_goal", payload:{ goal:"Win Week X matchup by optimizing RB efficiency" } })',
     '- For each todo: historian({ leagueId, kind:"todo", payload:{ item:"Start Player A over Player B in FLEX", status:"open" } })',
+    '',
+    'Example: Daily Report tool usage',
+    '- scout({ leagueId })',
+    '- analyst({ leagueId, scout: <scout_output> })',
+    '- executor({ leagueId, userId, actions:[{ type:"LINEUP_SWAP", summary:"Start Player A over Player B (OUT)", confidence:0.90, reason:"INJURY_OUT", swap:{ out:{ player_id:"..." }, in:{ player_id:"..." }, slot:"WR" } }] })',
+    '- historian({ leagueId, kind:"report", payload:{ summary:"Key injuries and lineup updates", lineup:["A->B (WR)"], waivers:[] } })',
+    'Note: In live mode, executor attempts execution for auto-eligible actions; otherwise items are staged or dry-run.',
   ].join('\n');
 }
 
