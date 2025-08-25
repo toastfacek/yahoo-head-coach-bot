@@ -159,6 +159,47 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
 }
 
 /**
+ * Simple token status for a user
+ */
+export async function tokenStatus(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = String((req.query as any).userId || 'dev');
+    const tok = await prisma.yahooToken.findUnique({ where: { userId } });
+    if (!tok) {
+      res.json({ userId, hasToken: false });
+      return;
+    }
+    const msLeft = tok.expiresAt.getTime() - Date.now();
+    res.json({
+      userId,
+      hasToken: true,
+      expiresAt: tok.expiresAt.toISOString(),
+      expiresInSeconds: Math.max(Math.floor(msLeft / 1000), 0),
+      scope: tok.scope,
+      tokenType: tok.tokenType
+    });
+  } catch (error) {
+    console.error('tokenStatus error:', error);
+    res.status(500).json({ error: 'Failed to fetch token status' });
+  }
+}
+
+/**
+ * Trigger a token refresh for a user
+ */
+export async function refreshNow(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = String((req.query as any).userId || 'dev');
+    await refreshToken(userId);
+    const tok = await prisma.yahooToken.findUnique({ where: { userId } });
+    res.json({ ok: true, userId, expiresAt: tok?.expiresAt?.toISOString() });
+  } catch (error: any) {
+    console.error('refreshNow error:', error);
+    res.status(500).json({ error: 'Refresh failed', message: error?.message || 'Unknown error' });
+  }
+}
+
+/**
  * Exchange authorization code for access and refresh tokens
  */
 async function exchangeCodeForTokens(code: string) {

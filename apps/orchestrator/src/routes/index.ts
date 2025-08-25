@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { healthCheck } from './health';
 import { dailyReport } from './reports';
-import { oauthStart, oauthCallback } from './oauth';
+import { oauthStart, oauthCallback, tokenStatus, refreshNow } from './oauth';
 import { checkLineup } from './lineup';
 import { runWaivers } from './waivers';
 import { listPending, approve, reject } from './approvals';
@@ -14,6 +14,8 @@ router.get('/health', healthCheck);
 // OAuth endpoints
 router.get('/oauth/start', oauthStart);
 router.get('/oauth/callback', oauthCallback);
+router.get('/oauth/status', tokenStatus);
+router.get('/oauth/refresh', refreshNow);
 
 // Reports endpoints
 router.get('/reports/daily', dailyReport);
