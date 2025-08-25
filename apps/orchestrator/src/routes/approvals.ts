@@ -3,8 +3,10 @@ import { z } from 'zod';
 import { prisma } from '../db';
 
 export async function listPending(req: Request, res: Response) {
-  const leagueId = String(req.query.leagueId || '');
-  if (!leagueId) return res.status(400).json({ error: 'leagueId is required' });
+  const Query = z.object({ leagueId: z.string().min(1) });
+  const parsed = Query.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
+  const { leagueId } = parsed.data;
   const pending = await prisma.recommendation.findMany({ where: { leagueId, status: 'STAGED' }, orderBy: { createdAt: 'desc' } });
   res.json({ pending });
 }
@@ -30,4 +32,3 @@ export async function reject(req: Request, res: Response) {
   await prisma.recommendation.update({ where: { id }, data: { status: 'REJECTED' } });
   res.json({ ok: true });
 }
-

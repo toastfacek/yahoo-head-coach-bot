@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import pinoHttp from 'pino-http';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import router from './routes';
 import { env, allowedOrigins } from './config/env';
@@ -14,6 +16,21 @@ const PORT = Number(env.PORT || 3000);
 // Security middleware
 app.use(helmet());
 
+// Structured request logging
+app.use(
+  pinoHttp({
+    autoLogging: true,
+    serializers: {
+      req(req) {
+        return { id: (req as any).id, method: req.method, url: req.url };
+      },
+      res(res) {
+        return { statusCode: res.statusCode };
+      },
+    },
+  })
+);
+
 // CORS configuration
 app.use(cors({ origin: allowedOrigins(), credentials: true }));
 
@@ -21,11 +38,10 @@ app.use(cors({ origin: allowedOrigins(), credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
-});
+// Basic rate limiting for scheduler and write-like endpoints
+const limiter = rateLimit({ windowMs: 60_000, max: 30 });
+app.use('/api/scheduler', limiter);
+app.use('/api/approvals', limiter);
 
 // API routes
 app.use('/api', router);

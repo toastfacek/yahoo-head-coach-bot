@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
 import { prisma } from '../db';
+import { z } from 'zod';
 import crypto from 'crypto';
 
 // Use shared Prisma client
@@ -25,7 +26,13 @@ setInterval(() => {
  */
 export async function oauthStart(req: Request, res: Response): Promise<void> {
   try {
-    const { userId } = req.query;
+    const Query = z.object({ userId: z.string().optional() });
+    const parsed = Query.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
+      return;
+    }
+    const { userId } = parsed.data;
     
     // Generate secure state parameter for CSRF protection
     const state = crypto.randomBytes(32).toString('hex');
@@ -63,7 +70,17 @@ export async function oauthStart(req: Request, res: Response): Promise<void> {
  */
 export async function oauthCallback(req: Request, res: Response): Promise<void> {
   try {
-    const { code, state, error: oauthError } = req.query;
+    const Query = z.object({
+      code: z.string().optional(),
+      state: z.string().optional(),
+      error: z.string().optional(),
+    });
+    const parsed = Query.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
+      return;
+    }
+    const { code, state, error: oauthError } = parsed.data as any;
     
     // Handle OAuth denial or error
     if (oauthError) {
