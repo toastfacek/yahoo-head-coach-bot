@@ -157,6 +157,33 @@ class DirectYahooClient {
     }
   }
 
+  async getTeamStats(teamKey: string): Promise<YahooApiResponse> {
+    try {
+      const response = await this.client.get(`/team/${teamKey}/stats`);
+      return { data: response.data, success: true };
+    } catch (error: any) {
+      return { data: null, success: false, error: error.message };
+    }
+  }
+
+  async getLeagueStandings(leagueKey: string): Promise<YahooApiResponse> {
+    try {
+      const response = await this.client.get(`/league/${leagueKey}/standings`);
+      return { data: response.data, success: true };
+    } catch (error: any) {
+      return { data: null, success: false, error: error.message };
+    }
+  }
+
+  async getLeagueTeams(leagueKey: string): Promise<YahooApiResponse> {
+    try {
+      const response = await this.client.get(`/league/${leagueKey}/teams`);
+      return { data: response.data, success: true };
+    } catch (error: any) {
+      return { data: null, success: false, error: error.message };
+    }
+  }
+
   // Transaction API - Add/Drop players
   async addDropPlayers(teamKey: string, addPlayerKey: string, dropPlayerKey?: string, fabBid?: number): Promise<YahooApiResponse> {
     try {
@@ -293,14 +320,58 @@ export function leagueKeyFor(gameKey: string, leagueId: string | number) {
 }
 
 export async function userTeamKey(yf: DirectYahooClient, gameKey: string, leagueKey: string): Promise<string | null> {
-  const user = await yf.getUserGameTeams(gameKey);
-  if (!user.success) {
+  try {
+    // First try to get teams directly from the league
+    const leagueTeams = await yf.getLeagueTeams(leagueKey);
+    if (leagueTeams.success && leagueTeams.data?.fantasy_content?.league?.[1]?.teams) {
+      const teamsData = leagueTeams.data.fantasy_content.league[1].teams;
+      
+      // Find our team by checking ownership
+      // Teams data is structured as an object with numeric keys
+      for (const key in teamsData) {
+        if (teamsData[key]?.team) {
+          const teamArray = teamsData[key].team[0]; // team[0] contains the team data array
+          
+          // Look for is_owned_by_current_login flag
+          for (let i = 0; i < teamArray.length; i++) {
+            if (teamArray[i]?.is_owned_by_current_login === 1) {
+              // Found our team, get the team_key from the first element
+              return teamArray[0]?.team_key || null;
+            }
+          }
+        }
+      }
+    }
+    
+    // Fallback: try the user game teams approach
+    const user = await yf.getUserGameTeams(gameKey);
+    if (!user.success) {
+      return null;
+    }
+    
+    // Check if teams is an object instead of array
+    let teamsData = user.data?.fantasy_content?.users?.[0]?.user?.[1]?.games?.[0]?.game?.[1]?.teams;
+    
+    if (teamsData && typeof teamsData === 'object') {
+      // If it's an object, convert to array
+      if (Array.isArray(teamsData)) {
+        const team = teamsData.find((t: any) => t.team_key && t.team_key.startsWith(leagueKey));
+        return team ? String(team.team_key) : null;
+      } else if (teamsData[0]?.team) {
+        // Handle different structure
+        const teams = teamsData[0].team;
+        if (Array.isArray(teams)) {
+          const team = teams.find((t: any) => t.team_key && t.team_key.startsWith(leagueKey));
+          return team ? String(team.team_key) : null;
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error finding user team key:', error);
     return null;
   }
-  
-  const teams = user.data?.fantasy_content?.users?.[0]?.user?.[1]?.games?.[0]?.game?.[1]?.teams || [];
-  const team = teams.find((t: any) => t.team_key && t.team_key.startsWith(leagueKey.replace('.l.', '.l.')));
-  return team ? String(team.team_key) : null;
 }
 
 export async function isLeaguePostDraft(yf: DirectYahooClient, leagueKey: string): Promise<boolean> {
