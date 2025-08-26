@@ -249,6 +249,10 @@ async function exchangeCodeForTokens(code: string) {
   ).toString('base64');
   
   try {
+    console.log('🔍 Token exchange debug:');
+    console.log('Redirect URI being sent:', process.env.YAHOO_REDIRECT_URI);
+    console.log('Form data:', formData.toString());
+    
     const response = await axios.post(tokenUrl, formData.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

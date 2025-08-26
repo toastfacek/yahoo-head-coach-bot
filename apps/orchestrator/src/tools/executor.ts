@@ -73,8 +73,8 @@ export async function proposeOrExecute({ leagueId, userId, actions }:{
           results.push({ id: rec.id, status: 'STAGED', autoEligible, note: 'team_key_not_found' });
           continue;
         }
-        // Placeholder: callYahoo is a stub until we wire write endpoints
-        const execRes = await callYahoo({ leagueKey, teamKey, action: a });
+        // Execute the action via Yahoo API
+        const execRes = await callYahoo({ leagueKey, teamKey, action: a, yf });
         if (execRes?.success) {
           await prisma.recommendation.update({ where: { id: rec.id }, data: { status: 'EXECUTED' } });
           results.push({ id: rec.id, status: 'EXECUTED', autoEligible });
