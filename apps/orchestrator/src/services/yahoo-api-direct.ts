@@ -31,6 +31,9 @@ class DirectYahooClient {
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'Yahoo Fantasy HeadCoach Bot/1.0'
+      },
+      params: {
+        format: 'json' // Request JSON format instead of XML
       }
     });
 
@@ -128,6 +131,16 @@ class DirectYahooClient {
   async getUserGameTeams(gameKey: string): Promise<YahooApiResponse> {
     try {
       const response = await this.client.get(`/users;use_login=1/games;game_keys=${gameKey}/teams`);
+      return { data: response.data, success: true };
+    } catch (error: any) {
+      return { data: null, success: false, error: error.message };
+    }
+  }
+
+  // Get user's leagues for a specific game
+  async getUserGameLeagues(gameKey: string): Promise<YahooApiResponse> {
+    try {
+      const response = await this.client.get(`/users;use_login=1/games;game_keys=${gameKey}/leagues`);
       return { data: response.data, success: true };
     } catch (error: any) {
       return { data: null, success: false, error: error.message };
@@ -260,26 +273,50 @@ export async function yfForUser(userId: string) {
   };
 }
 
-export async function getGameKey(yf: any, code = 'nfl'): Promise<string> {
-  const meta = await yf.game.meta(code);
-  return String(meta.game_key);
+export async function getGameKey(yf: DirectYahooClient, code = 'nfl'): Promise<string> {
+  const meta = await yf.getGameMeta(code);
+  if (!meta.success) {
+    throw new Error(`Failed to get game meta: ${meta.error}`);
+  }
+  
+  // Extract game key from Yahoo's response structure
+  const gameKey = meta.data?.fantasy_content?.game?.[0]?.game_key;
+  if (!gameKey) {
+    throw new Error('No game key found in response');
+  }
+  
+  return String(gameKey);
 }
 
 export function leagueKeyFor(gameKey: string, leagueId: string | number) {
   return `${gameKey}.l.${leagueId}`;
 }
 
-export async function userTeamKey(yf: any, gameKey: string, leagueKey: string): Promise<string | null> {
-  const user = await yf.user.game_teams(gameKey);
-  const teams = user.teams || [];
-  const team = teams.find((t: any) => t.team_key && t.league_key === leagueKey);
+export async function userTeamKey(yf: DirectYahooClient, gameKey: string, leagueKey: string): Promise<string | null> {
+  const user = await yf.getUserGameTeams(gameKey);
+  if (!user.success) {
+    return null;
+  }
+  
+  const teams = user.data?.fantasy_content?.users?.[0]?.user?.[1]?.games?.[0]?.game?.[1]?.teams || [];
+  const team = teams.find((t: any) => t.team_key && t.team_key.startsWith(leagueKey.replace('.l.', '.l.')));
   return team ? String(team.team_key) : null;
 }
 
-export async function isLeaguePostDraft(yf: any, leagueKey: string): Promise<boolean> {
-  const meta = await yf.league.meta(leagueKey);
-  const draftStatus = (meta?.draft_status || '').toLowerCase();
-  return draftStatus === 'postdraft';
+export async function isLeaguePostDraft(yf: DirectYahooClient, leagueKey: string): Promise<boolean> {
+  try {
+    const meta = await yf.getLeagueMeta(leagueKey);
+    if (!meta.success) {
+      return false; // Assume not post-draft if we can't check
+    }
+    
+    const draftStatus = meta.data?.fantasy_content?.league?.[0]?.draft_status || '';
+    const status = String(draftStatus).toLowerCase();
+    return status === 'postdraft' || status.includes('completed') || status.includes('finished');
+  } catch (error) {
+    console.log('Could not check draft status, assuming post-draft:', error);
+    return true; // Default to allowing execution
+  }
 }
 
 export async function stageActions(leagueId: string, actions: any[]) {
