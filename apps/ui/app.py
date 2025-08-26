@@ -196,6 +196,67 @@ st.markdown("""
         background: #F8FAFC;
     }
     
+    /* Ensure sidebar expand button is always visible */
+    .css-1lcbmhc .css-1outpf7 {
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* Style the sidebar toggle button */
+    .css-1lcbmhc .css-1outpf7 .css-1cpxqw2 {
+        background: #3B82F6 !important;
+        color: white !important;
+        border-radius: 0 8px 8px 0 !important;
+        padding: 8px !important;
+        margin-top: 10px !important;
+    }
+    
+    /* Sidebar collapse/expand button styling */
+    .css-1lcbmhc .css-1outpf7:hover .css-1cpxqw2 {
+        background: #2563EB !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* Make sure the sidebar toggle is always accessible */
+    [data-testid="collapsedControl"] {
+        display: block !important;
+        visibility: visible !important;
+        z-index: 999999 !important;
+        background: #3B82F6 !important;
+        border-radius: 0 8px 8px 0 !important;
+        margin-top: 10px !important;
+    }
+    
+    [data-testid="collapsedControl"]:hover {
+        background: #2563EB !important;
+    }
+    
+    /* Floating expand button as backup */
+    .floating-expand-btn {
+        position: fixed;
+        top: 20px;
+        left: 10px;
+        z-index: 999999;
+        background: #3B82F6;
+        color: white;
+        border: none;
+        border-radius: 0 8px 8px 0;
+        padding: 8px 12px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        font-size: 16px;
+        display: none;
+    }
+    
+    .floating-expand-btn:hover {
+        background: #2563EB;
+    }
+    
+    /* Show floating button when sidebar is collapsed */
+    .css-1lcbmhc.css-12ttj6m ~ .main .floating-expand-btn {
+        display: block;
+    }
+    
     /* Status indicators */
     .status-indicator {
         display: inline-flex;
@@ -222,6 +283,75 @@ st.markdown("""
         color: #991B1B;
     }
 </style>
+""", unsafe_allow_html=True)
+
+# Add floating expand button with JavaScript
+st.markdown("""
+<div class="floating-expand-btn" onclick="expandSidebar()">☰</div>
+
+<script>
+function expandSidebar() {
+    // Try multiple methods to expand the sidebar
+    
+    // Method 1: Click the Streamlit collapse button
+    const collapseBtn = document.querySelector('[data-testid="collapsedControl"]');
+    if (collapseBtn) {
+        collapseBtn.click();
+        return;
+    }
+    
+    // Method 2: Try other Streamlit sidebar toggle selectors
+    const toggleSelectors = [
+        '.css-1lcbmhc .css-1outpf7',
+        '.css-1cpxqw2',
+        '[aria-label="Open sidebar"]',
+        '.sidebar-toggle',
+        '.css-1lcbmhc button'
+    ];
+    
+    for (const selector of toggleSelectors) {
+        const btn = document.querySelector(selector);
+        if (btn) {
+            btn.click();
+            return;
+        }
+    }
+    
+    // Method 3: Force show sidebar by manipulating classes
+    const sidebar = document.querySelector('.css-1lcbmhc');
+    if (sidebar && sidebar.classList.contains('css-12ttj6m')) {
+        sidebar.classList.remove('css-12ttj6m');
+    }
+    
+    // Hide the floating button after expanding
+    setTimeout(() => {
+        const floatingBtn = document.querySelector('.floating-expand-btn');
+        if (floatingBtn) floatingBtn.style.display = 'none';
+    }, 100);
+}
+
+// Auto-detect when sidebar is collapsed and show floating button
+function checkSidebarState() {
+    const sidebar = document.querySelector('.css-1lcbmhc');
+    const floatingBtn = document.querySelector('.floating-expand-btn');
+    
+    if (sidebar && floatingBtn) {
+        if (sidebar.classList.contains('css-12ttj6m')) {
+            // Sidebar is collapsed
+            floatingBtn.style.display = 'block';
+        } else {
+            // Sidebar is expanded  
+            floatingBtn.style.display = 'none';
+        }
+    }
+}
+
+// Check sidebar state periodically
+setInterval(checkSidebarState, 500);
+
+// Initial check
+setTimeout(checkSidebarState, 1000);
+</script>
 """, unsafe_allow_html=True)
 
 # Initialize session state
