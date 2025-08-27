@@ -5,10 +5,10 @@ export function shouldAutoExecute(rec: {
   confidence: number;
   isInjuryOut?: boolean;
   fabBid?: number;              // absolute FAB bid
-  fabRemaining?: number;        // team’s remaining FAB
+  fabRemaining?: number;        // team's remaining FAB
 }) {
-  // Always gate by confidence first
-  if (rec.confidence < POLICY.confidence.execute) return false;
+  // Always gate by confidence first - ensure it's a valid number
+  if (typeof rec.confidence !== 'number' || isNaN(rec.confidence) || rec.confidence < POLICY.confidence.execute) return false;
 
   if (rec.type === 'LINEUP_SWAP' && rec.isInjuryOut && POLICY.autoSwapInjuryOut) {
     return true;

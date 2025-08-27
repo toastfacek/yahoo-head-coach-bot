@@ -65,16 +65,18 @@ model Signal {
 }
 
 model Recommendation {
-  id           String   @id @default(cuid())
-  leagueId     String
-  type         String   // LINEUP_SWAP | WAIVER
-  summary      String
-  payload      Json
-  confidence   Float
-  fabBid       Int?
-  autoEligible Boolean  @default(false)
-  status       String   @default("STAGED") // STAGED|EXECUTED|REJECTED
-  createdAt    DateTime @default(now())
+  id              String    @id @default(cuid())
+  leagueId        String
+  type            String    // LINEUP_SWAP | WAIVER
+  summary         String
+  payload         Json
+  confidence      Float
+  fabBid          Int?
+  autoEligible    Boolean   @default(false)
+  status          String    @default("STAGED") // STAGED|EXECUTED|REJECTED
+  createdAt       DateTime  @default(now())
+  executedAt      DateTime?
+  executionResult Json?
 }
 
 model Decision {

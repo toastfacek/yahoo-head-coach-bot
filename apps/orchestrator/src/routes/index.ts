@@ -7,6 +7,10 @@ import { runWaivers } from './waivers';
 import { listPending, approve, reject } from './approvals';
 import { weeklySummary } from './memory';
 import { hourly } from './scheduler';
+import { handleChat, getChatHistory } from './chat';
+import { getLeagues } from './leagues';
+import { getTeamStats } from './teams';
+import { getTeamRoster } from './roster';
 
 const router = Router();
 
@@ -37,6 +41,15 @@ router.get('/scheduler/hourly', hourly);
 // Memory endpoints
 router.get('/memory/weekly', weeklySummary);
 
+// Chat endpoints
+router.post('/chat', handleChat);
+router.get('/chat/history', getChatHistory);
+
+// Yahoo Fantasy API endpoints
+router.get('/leagues', getLeagues);
+router.get('/team/stats', getTeamStats);
+router.get('/team/roster', getTeamRoster);
+
 // Root endpoint
 router.get('/', (req, res) => {
   res.json({
@@ -61,6 +74,10 @@ router.get('/', (req, res) => {
         pending: '/approvals/pending',
         approve: '/approvals/approve',
         reject: '/approvals/reject'
+      },
+      chat: {
+        send: '/chat',
+        history: '/chat/history'
       }
     }
   });

@@ -53,6 +53,10 @@ This document outlines the product requirements for the initial version (MVP).
     - **Language:** TypeScript.
     - **Core AI:** Vercel AI SDK with Anthropic Claude 3 Sonnet for the core agent logic.
     - **Scheduling:** An hourly cron job will trigger a scheduler endpoint, which will gate the daily run to 10:00 PM ET.
+- **MCP Servers (Tool Backends):**
+    - Each tool (scout, analyst, executor, historian, recall) is a thin wrapper over a Model Context Protocol (MCP) server.
+    - The MCP server performs the reasoning (when needed) and returns structured JSON outputs that the orchestrator consumes.
+    - Advantages: separation of concerns, reproducible structured I/O, and ability to scale/iterate reasoning independently of the web API.
 - **Frontend UI:**
     - **Framework:** Streamlit (Python).
     - **Communication:** The UI will communicate with the backend via a REST API and Server-Sent Events (SSE) for streaming reports.
@@ -90,6 +94,14 @@ The backend will expose the following REST endpoints for the UI:
 - `GET /oauth/callback`: Handles the OAuth callback from Yahoo.
 
 ## 6. Success Metrics (MVP)
+
+## 7. Memory & Weekly Goals
+
+- The agent maintains short-term memory using the Historian and Recall tools.
+- Weekly cycle:
+  - Generate and persist a concise weekly goal (`kind=weekly_goal`) and 3–5 todos (`kind=todo`).
+  - Each week, assess progress against the stored goal/todos and refine the plan.
+- Historian stores structured entries; Recall fetches recent `weekly_goal`, `todo`, and `report` signals to ground the agent’s planning.
 
 - **Functionality:** All features listed in section 2 are implemented and functional.
 - **Stability:** The daily job runs reliably without manual intervention.

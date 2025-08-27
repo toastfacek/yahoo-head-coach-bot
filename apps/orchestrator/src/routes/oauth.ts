@@ -85,29 +85,32 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     // Handle OAuth denial or error
     if (oauthError) {
       console.error('OAuth error from Yahoo:', oauthError);
-      res.status(400).json({
-        error: 'OAuth authorization failed',
-        details: oauthError
-      });
+      res.status(400).send(`
+        <h2>❌ Yahoo Authorization Failed</h2>
+        <p>Error: ${oauthError}</p>
+        <p>Please try authenticating again.</p>
+      `);
       return;
     }
     
     // Validate required parameters
     if (!code || !state) {
-      res.status(400).json({
-        error: 'Missing required OAuth parameters',
-        message: 'Authorization code and state are required'
-      });
+      res.status(400).send(`
+        <h2>❌ Missing OAuth Parameters</h2>
+        <p>Authorization code and state are required</p>
+        <p>Please try authenticating again.</p>
+      `);
       return;
     }
     
     // Validate state parameter (CSRF protection)
     const stateData = stateStore.get(state as string);
     if (!stateData) {
-      res.status(400).json({
-        error: 'Invalid or expired state parameter',
-        message: 'Possible CSRF attack or expired authorization request'
-      });
+      res.status(400).send(`
+        <h2>❌ Invalid Authorization Request</h2>
+        <p>Invalid or expired state parameter</p>
+        <p>Please try authenticating again.</p>
+      `);
       return;
     }
     
@@ -157,21 +160,25 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     
     console.log(`OAuth tokens stored successfully for user: ${userId}`);
     
-    // Success response
-    res.json({
-      success: true,
-      message: 'OAuth authorization completed successfully',
-      userId: user.id,
-      tokenExpires: expiresAt.toISOString(),
-      scope: tokenResponse.scope || 'fspt-w'
-    });
+    // Success response - HTML format to match working simple-server implementation
+    res.send(`
+      <h2>✅ Yahoo Authentication Complete!</h2>
+      <p>Tokens successfully stored for user: <strong>${userId}</strong></p>
+      <p>You can now return to your Streamlit app and refresh the page.</p>
+      <script>
+        setTimeout(() => {
+          window.close();
+        }, 3000);
+      </script>
+    `);
     
   } catch (error) {
     console.error('OAuth callback error:', error);
-    res.status(500).json({
-      error: 'OAuth callback processing failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    res.status(500).send(`
+      <h2>❌ OAuth Processing Failed</h2>
+      <p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+      <p>Please try authenticating again.</p>
+    `);
   }
 }
 

@@ -154,6 +154,27 @@ model CostLog {
   context          String?
   createdAt        DateTime @default(now())
 }
+
+model TeamJournal {
+  id        String   @id @default(cuid())
+  leagueId  String   @unique
+  content   String   // Markdown content
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model Memory {
+  id        String   @id @default(cuid())
+  leagueId  String
+  kind      String   // weekly_goal | player_note | league_mate_pattern
+  content   Json
+  week      Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leagueId, kind])
+  @@index([leagueId, week])
+}
 ```
 
 **Generate**
@@ -172,13 +193,33 @@ export const db = new PrismaClient();
 
 ## 2) Backend Orchestrator (Express + Vercel AI SDK)
 
-**Goal:** Express server with AI SDK “HeadCoach” agent and tools: `scout`, `analyst`, `executor`, `historian`.
+**Goal:** Express server with AI SDK "HeadCoach" agent and enhanced tools: `scout`, `analyst` (with sub-agent), `executor`, `historian`.
+
+### Architecture Enhancement: Analyst Sub-Agent
+
+The system uses a two-tier agent architecture:
+- **HeadCoach Agent** (Claude 3.5 Sonnet) - Main orchestrator with reasoning and decision-making
+- **Analyst Sub-Agent** (Claude 3.5 Haiku) - Specialized analysis with cost optimization
+
+```
+HeadCoach Agent (Orchestrator)
+    ├── scout() → External data aggregation  
+    ├── analyst() → Delegates to Analyst Sub-Agent for complex analysis
+    ├── executor() → Policy-driven execution/staging
+    └── historian() → Memory persistence + journal system
+
+Analyst Sub-Agent (Specialist)
+    ├── Multi-factor waiver analysis with confidence algorithms
+    ├── Advanced lineup optimization (weather, matchups, vegas)
+    ├── Trade value analysis and expert consensus integration
+    └── Structured output schemas with reasoning explanations
+```
 
 **Install**
 ```bash
 cd apps/orchestrator
-npm i express cors zod ai @ai-sdk/anthropic luxon yahoo-fantasy
-npm i -D ts-node typescript @types/express @types/cors
+npm i express cors zod ai @ai-sdk/anthropic luxon yahoo-fantasy redis ioredis
+npm i -D ts-node typescript @types/express @types/cors @types/redis
 ```
 
 **File:** `apps/orchestrator/src/config/policy.ts`
@@ -231,22 +272,104 @@ export async function yfForUser(userId: string) {
 }
 ```
 
-**Scout placeholders**
+**Enhanced External Data Sources**
 
-**Files:** `apps/orchestrator/src/services/scout/*.ts`
+**Files:** `apps/orchestrator/src/services/data/*.ts`
+
 ```ts
-// athletic.ts
-export async function fromAthletic(playerIds:string[]) { /* TODO: respect ToS; store URL + timestamp */ return []; }
-// rotoballer.ts
-export async function fromRotoballer(playerIds:string[]) { return []; }
-// reddit.ts
-export async function fromReddit(subreddits:string[]) { return []; }
-// xlist.ts
-export async function fromXList(listId:string) { return []; }
-// vegas.ts
-export async function fromVegas(matchups:string[]) { return []; }
-// weather.ts (Open-Meteo suggested)
-export async function fromWeather(stadium:{lat:number;lon:number;time:string}) { return []; }
+// news.ts - News aggregation from multiple sources
+export async function aggregatePlayerNews(playerIds: string[]) {
+  const sources = [
+    await fromAthletic(playerIds),
+    await fromRotoballer(playerIds), 
+    await fromESPNRss(playerIds),
+    await fromRedditMentions(playerIds)
+  ];
+  return sources.flat().map(news => ({
+    ...news,
+    sentiment: analyzeNewsSentiment(news.title + ' ' + news.summary),
+    injury_related: isInjuryNews(news.title + ' ' + news.summary)
+  }));
+}
+
+// weather.ts - OpenWeatherMap integration
+export async function getWeatherData(gameLocations: string[]) {
+  const apiKey = process.env.OPENWEATHER_API_KEY;
+  const forecasts = [];
+  for (const location of gameLocations) {
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${location}&appid=${apiKey}&units=imperial`;
+    const response = await fetch(url);
+    const data = await response.json();
+    forecasts.push({
+      location,
+      temperature: data.main.temp,
+      wind_speed: data.wind.speed,
+      conditions: data.weather[0].main,
+      fantasy_impact: assessWeatherImpact(data)
+    });
+  }
+  return forecasts;
+}
+
+// vegas.ts - Odds API integration
+export async function getVegasLines(week: number) {
+  const apiKey = process.env.ODDS_API_KEY;
+  const url = `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?apiKey=${apiKey}&regions=us&markets=totals,spreads`;
+  const response = await fetch(url);
+  const data = await response.json();
+  return data.map((game: any) => ({
+    game: `${game.away_team} @ ${game.home_team}`,
+    spread: extractSpread(game.bookmakers),
+    total: extractTotal(game.bookmakers),
+    game_script: analyzeGameScript(game)
+  }));
+}
+
+// reddit.ts - r/fantasyfootball sentiment
+export async function getRedditSentiment(playerNames: string[]) {
+  // Reddit API integration for sentiment analysis
+  // Returns player mentions with upvote/comment sentiment scores
+}
+
+// expert-rankings.ts - FantasyPros ECR
+export async function getExpertRankings(position: string = 'ALL') {
+  // FantasyPros API integration for expert consensus rankings
+  // Returns ECR data with standard deviation and agreement levels
+}
+
+// trade-values.ts - Multi-source trade values
+export async function aggregateTradeValues() {
+  const sources = {
+    cbs: await getCBSTradeValues(),
+    fantasypros: await getFantasyProsValues(), 
+    reddit: await getRedditTradeChart()
+  };
+  return consolidateTradeValues(sources);
+}
+```
+
+**Caching Layer:** `apps/orchestrator/src/services/cache.ts`
+```ts
+// Redis-based caching for external API responses
+export class DataCache {
+  private redis: Redis;
+  private ttl = {
+    news: 1800,        // 30 minutes
+    weather: 3600,     // 1 hour 
+    vegas: 3600,       // 1 hour
+    rankings: 7200,    // 2 hours
+    trade_values: 86400 // 24 hours
+  };
+
+  async get<T>(key: string): Promise<T | null> {
+    const cached = await this.redis.get(key);
+    return cached ? JSON.parse(cached) : null;
+  }
+
+  async set(key: string, value: any, category: keyof typeof this.ttl): Promise<void> {
+    await this.redis.setex(key, this.ttl[category], JSON.stringify(value));
+  }
+}
 ```
 
 **Tools**
@@ -262,15 +385,156 @@ export async function scout({ leagueId }:{ leagueId: string }) {
 }
 ```
 
-**File:** `apps/orchestrator/src/tools/analyst.ts`
+**File:** `apps/orchestrator/src/agents/analyst.ts` - Enhanced Sub-Agent
 ```ts
-export async function analyze({ leagueId, window = 'DAILY' }:{
-  leagueId: string; window?: 'WEEK'|'DAILY'|'SUNDAY_FINAL';
+import { Anthropic } from '@anthropic-ai/sdk';
+import { z } from 'zod';
+import { aggregatePlayerNews, getWeatherData, getVegasLines } from '../services/data';
+
+// Analyst Sub-Agent with dedicated reasoning capabilities
+export class AnalystAgent {
+  private client: Anthropic;
+  private model = 'claude-3-5-haiku-20241022'; // Cost-optimized for analysis
+
+  constructor(apiKey: string) {
+    this.client = new Anthropic({ apiKey });
+  }
+
+  async analyzeWaiverTargets(input: {
+    availablePlayers: any[];
+    rosterNeeds: string[];
+    fabBudget: number;
+    tradeValues: any;
+    expertRankings: any[];
+  }) {
+    const prompt = `Analyze waiver wire targets with multi-factor scoring:
+    
+Available Players: ${JSON.stringify(input.availablePlayers.slice(0, 20))}
+Roster Needs: ${input.rosterNeeds}
+FAB Budget: $${input.fabBudget}
+Trade Values: ${JSON.stringify(input.tradeValues)}
+Expert Rankings: ${JSON.stringify(input.expertRankings)}
+
+For each recommended player, provide:
+1. Multi-factor confidence score (0-100) considering:
+   - Trade value vs. roster need fit
+   - Expert consensus vs. ownership
+   - Recent news sentiment
+   - Rest-of-season projection
+2. Recommended FAB bid with rationale
+3. Drop candidate analysis
+4. Risk assessment
+
+Return structured JSON with reasoning.`;
+
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: 2000,
+      system: 'You are a fantasy football analyst specializing in waiver wire evaluation. Provide data-driven recommendations with clear reasoning and confidence scores.',
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    return this.parseRecommendations(response.content[0].text);
+  }
+
+  async optimizeLineup(input: {
+    roster: any[];
+    matchups: any;
+    weather: any[];
+    vegasLines: any[];
+  }) {
+    const prompt = `Optimize lineup considering all factors:
+
+Roster: ${JSON.stringify(input.roster)}
+Matchup Data: ${JSON.stringify(input.matchups)}
+Weather: ${JSON.stringify(input.weather)}
+Vegas Lines: ${JSON.stringify(input.vegasLines)}
+
+Provide:
+1. Optimal starting lineup with confidence scores
+2. Key start/sit decisions with multi-factor reasoning
+3. Weather impact analysis
+4. Game script implications
+5. Flex position optimization
+
+Return structured recommendations.`;
+
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: 1500,
+      system: 'You are a fantasy football analyst specializing in lineup optimization. Consider weather, matchups, and game scripts in your analysis.',
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    return this.parseLineupOptimization(response.content[0].text);
+  }
+
+  private parseRecommendations(text: string) {
+    // Parse LLM response into structured format
+    // Implementation would extract JSON or structured data from response
+    return [];
+  }
+
+  private parseLineupOptimization(text: string) {
+    // Parse lineup optimization into structured format
+    return { lineup: [], analysis: text };
+  }
+}
+```
+
+**File:** `apps/orchestrator/src/tools/analyst.ts` - Enhanced Tool Integration
+```ts
+import { AnalystAgent } from '../agents/analyst';
+import { aggregatePlayerNews, getWeatherData, getVegasLines, aggregateTradeValues } from '../services/data';
+
+const analystAgent = new AnalystAgent(process.env.ANTHROPIC_API_KEY!);
+
+export async function analyze({ leagueId, window = 'DAILY', scout }:{
+  leagueId: string; window?: 'WEEK'|'DAILY'|'SUNDAY_FINAL'; scout?: any;
 }) {
-  // TODO: rules + projections + conflicts → normalized actions
+  // For complex analysis, delegate to the Analyst Sub-Agent
+  if (window === 'WEEK' || window === 'DAILY') {
+    // Gather enhanced data
+    const playerIds = scout?.roster?.map((p: any) => p.player_id) || [];
+    const [news, weather, vegas, tradeValues] = await Promise.all([
+      aggregatePlayerNews(playerIds),
+      getWeatherData(['Buffalo', 'Miami', 'Green Bay']), // TODO: derive from matchups
+      getVegasLines(getCurrentWeek()),
+      aggregateTradeValues()
+    ]);
+
+    // Delegate waiver analysis to sub-agent
+    const waiverAnalysis = await analystAgent.analyzeWaiverTargets({
+      availablePlayers: scout?.availablePlayers || [],
+      rosterNeeds: ['RB2', 'WR3'], // TODO: derive from roster analysis
+      fabBudget: scout?.fabRemaining || 100,
+      tradeValues,
+      expertRankings: []
+    });
+
+    // Delegate lineup optimization to sub-agent
+    const lineupOptimization = await analystAgent.optimizeLineup({
+      roster: scout?.roster || [],
+      matchups: scout?.matchups || {},
+      weather,
+      vegasLines: vegas
+    });
+
+    return {
+      analysis: `Enhanced analysis completed using ${news.length} news sources, weather data for ${weather.length} games, and ${vegas.length} Vegas lines.`,
+      recommendations: [...waiverAnalysis, ...lineupOptimization.lineup],
+      reasoning: {
+        waiver_analysis: waiverAnalysis,
+        lineup_optimization: lineupOptimization.analysis,
+        data_sources: { news: news.length, weather: weather.length, vegas: vegas.length }
+      }
+    };
+  }
+
+  // Fallback to simple analysis for basic requests
   return {
-    lineup: [], // e.g., [{ type:'LINEUP_SWAP', summary:'Start X over Y', confidence:0.82, reason:'INJURY_OUT' }]
-    waivers: [] // e.g., [{ type:'WAIVER', summary:'Add X for Y', fabBid:12, fabRemaining:400, confidence:0.87 }]
+    analysis: 'Basic analysis completed',
+    recommendations: []
   };
 }
 ```
@@ -310,12 +574,129 @@ export async function proposeOrExecute({ leagueId, userId, actions }:{
 }
 ```
 
-**File:** `apps/orchestrator/src/tools/historian.ts`
+**File:** `apps/orchestrator/src/tools/historian.ts` - Enhanced with Journal System
 ```ts
 import { db } from '@data/db';
-export async function record({ leagueId, payload }:{ leagueId:string; payload:any }) {
-  // persist signals, recommendations, decisions as needed
-  return db.signal.create({ data: { leagueId, kind:'meta', payload, source:'headcoach' }});
+import { promises as fs } from 'fs';
+import { join } from 'path';
+
+const JOURNAL_DIR = join(process.cwd(), 'team_journals');
+
+export async function record({ leagueId, payload, kind = 'report' }:{ 
+  leagueId: string; payload: any; kind?: string;
+}) {
+  // Database persistence for structured data
+  const dbEntry = await db.signal.create({ 
+    data: { leagueId, kind, payload, source: 'headcoach' }
+  });
+
+  // Journal system for human-readable memory
+  if (kind === 'weekly_goal' || kind === 'weekly_summary') {
+    await updateTeamJournal(leagueId, kind, payload);
+  }
+
+  if (kind === 'decision') {
+    await logDecision(leagueId, payload);
+  }
+
+  return { recorded: true, id: dbEntry.id };
+}
+
+async function updateTeamJournal(leagueId: string, section: string, content: any) {
+  await fs.mkdir(JOURNAL_DIR, { recursive: true });
+  const journalPath = join(JOURNAL_DIR, `${leagueId}_journal.md`);
+  
+  let journal = '';
+  try {
+    journal = await fs.readFile(journalPath, 'utf-8');
+  } catch {
+    journal = initializeJournal(leagueId);
+  }
+
+  const updatedJournal = updateJournalSection(journal, section, content);
+  await fs.writeFile(journalPath, updatedJournal, 'utf-8');
+}
+
+async function logDecision(leagueId: string, decision: any) {
+  await fs.mkdir(JOURNAL_DIR, { recursive: true });
+  const decisionsPath = join(JOURNAL_DIR, `${leagueId}_decisions.md`);
+  
+  const timestamp = new Date().toISOString().split('T')[0];
+  const entry = `## ${timestamp} - ${decision.type}\n\n**Action**: ${decision.summary}\n**Confidence**: ${decision.confidence}%\n**Reasoning**: ${decision.reasoning}\n**Outcome**: ${decision.outcome || 'Pending'}\n\n---\n\n`;
+  
+  try {
+    const existing = await fs.readFile(decisionsPath, 'utf-8');
+    await fs.writeFile(decisionsPath, entry + existing, 'utf-8');
+  } catch {
+    const header = `# Team Decisions Log - League ${leagueId}\n\n`;
+    await fs.writeFile(decisionsPath, header + entry, 'utf-8');
+  }
+}
+
+function initializeJournal(leagueId: string): string {
+  return `# Team Journal - League ${leagueId}\n*Last Updated: ${new Date().toISOString().split('T')[0]}*\n\n## Current Status\n- Record: TBD\n- Standing: TBD\n- FAB Remaining: TBD\n\n## Weekly Goals\n*Goals will be updated weekly*\n\n## Key Strengths\n*To be identified*\n\n## Areas for Improvement\n*To be identified*\n\n## Decision Patterns\n*Track decision accuracy over time*\n\n---\n`;
+}
+
+function updateJournalSection(journal: string, section: string, content: any): string {
+  const lines = journal.split('\n');
+  const sectionHeader = `## ${section.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+  
+  // Find section start and end
+  let sectionStart = -1;
+  let sectionEnd = -1;
+  
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes(sectionHeader)) {
+      sectionStart = i;
+    } else if (sectionStart !== -1 && lines[i].startsWith('##')) {
+      sectionEnd = i;
+      break;
+    }
+  }
+  
+  if (sectionEnd === -1) sectionEnd = lines.length;
+  
+  // Update section content
+  const newContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+  const updatedLines = [
+    ...lines.slice(0, sectionStart + 1),
+    newContent,
+    '',
+    ...lines.slice(sectionEnd)
+  ];
+  
+  // Update timestamp
+  const timestamp = `*Last Updated: ${new Date().toISOString().split('T')[0]}*`;
+  updatedLines[1] = timestamp;
+  
+  return updatedLines.join('\n');
+}
+
+// Memory recall function for context handoff
+export async function getTeamMemory(leagueId: string) {
+  const journalPath = join(JOURNAL_DIR, `${leagueId}_journal.md`);
+  const decisionsPath = join(JOURNAL_DIR, `${leagueId}_decisions.md`);
+  
+  try {
+    const [journal, decisions, recentSignals] = await Promise.all([
+      fs.readFile(journalPath, 'utf-8').catch(() => ''),
+      fs.readFile(decisionsPath, 'utf-8').catch(() => ''),
+      db.signal.findMany({
+        where: { leagueId },
+        orderBy: { asOf: 'desc' },
+        take: 10
+      })
+    ]);
+    
+    return {
+      journal,
+      recentDecisions: decisions.split('---').slice(0, 5).join('---'),
+      recentSignals: recentSignals.map(s => ({ kind: s.kind, payload: s.payload, asOf: s.asOf }))
+    };
+  } catch (error) {
+    console.error('Error retrieving team memory:', error);
+    return { journal: '', recentDecisions: '', recentSignals: [] };
+  }
 }
 ```
 
@@ -345,13 +726,13 @@ export async function runHeadCoach({ leagueId, userId, intent }:{
         inputSchema: z.object({ leagueId:z.string() }),
         execute: ({ leagueId }) => scout({ leagueId }) }),
       analyst: tool({ description:'Analyze into actions',
-        inputSchema: z.object({ leagueId:z.string(), window: z.string().optional() }),
+        inputSchema: z.object({ leagueId:z.string(), window: z.string().optional(), scout: z.any().optional() }),
         execute: (i) => analyze(i) }),
       executor: tool({ description:'Stage/Execute with policy',
         inputSchema: z.object({ leagueId:z.string(), userId:z.string(), actions: z.array(z.any()) }),
         execute: (i) => proposeOrExecute(i) }),
       historian: tool({ description:'Persist audit trail',
-        inputSchema: z.object({ leagueId:z.string(), payload:z.any() }),
+        inputSchema: z.object({ leagueId:z.string(), payload:z.any(), kind: z.string().optional() }),
         execute: (i) => record(i) }),
     }
   });
@@ -469,6 +850,36 @@ app.listen(process.env.PORT || 8787, () => console.log('Orchestrator up'));
 
 ---
 
+## 3.5) MCP Servers (Tool Backends)
+
+Goal: Each tool call in the orchestrator delegates to an MCP server that produces structured outputs (and can embed reasoning models).
+
+Why MCP: Clear separation of concerns, testable inputs/outputs, and the ability to evolve model prompts/strategies independently of the web API.
+
+Services (suggested structure):
+- apps/mcp-scout — outputs roster/injuries/news signals.
+- apps/mcp-analyst — consumes signals/roster, returns normalized actions with confidences.
+- apps/mcp-executor — validates policy and produces execution/staging intents.
+- apps/mcp-historian — persists/recalls structured memory (weekly_goal, todo, report, memory).
+- apps/mcp-recall — fetches a trimmed memory context for runs.
+
+I/O (example schemas):
+```jsonc
+// analyst.out
+{
+  "analysis": "string",
+  "recommendations": [
+    { "type":"LINEUP_SWAP", "summary":"string", "confidence":0.82, "reason":"INJURY_RISK", "swap": { "out": {"player_id":"..."}, "in": {"player_id":"..."}, "slot":"WR" } }
+  ]
+}
+```
+
+Integration:
+- Orchestrator tool execute calls MCP server (HTTP or MCP transport), validates JSON with Zod, returns to the agent.
+- Keep local stubs as fallbacks for development.
+
+---
+
 ## 4) Streamlit UI
 
 **Goal:** Keep your existing `app.py`, link to backend, add optional policy sliders.
@@ -525,12 +936,17 @@ DATABASE_URL=postgresql://...
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 
-# Scout (optional placeholders)
+# External Data Sources
 REDDIT_CLIENT_ID=
 REDDIT_CLIENT_SECRET=
 REDDIT_USER_AGENT=FantasyHeadCoach/1.0
 X_BEARER_TOKEN=
 ODDS_API_KEY=
+OPENWEATHER_API_KEY=
+FANTASYPROS_API_KEY=
+
+# Redis Cache
+REDIS_URL=redis://localhost:6379
 ```
 
 ---
@@ -634,6 +1050,21 @@ curl "http://localhost:8787/approvals/pending?leagueId=123"
 - Injury OUT swaps auto-exec.
 - Waivers auto-exec when `fabBid / fabRemaining ≤ 0.03`.
 - Confidence execution cutoff 0.80 respected.
+
+**M8 – Enhanced Data Integration (Phase 2)**
+- External data sources operational (news, weather, Vegas).
+- Redis caching layer implemented.
+- Analyst sub-agent with advanced reasoning.
+
+**M9 – Journal Memory System (Phase 2)**
+- Team journal persistence with markdown format.
+- Decision logging and outcome tracking.
+- Memory recall system for context handoff.
+
+**M10 – Advanced Analysis (Phase 2)**
+- Multi-factor waiver analysis with trade values.
+- Weather and game script lineup optimization.
+- Expert consensus integration for confidence scoring.
 
 ---
 

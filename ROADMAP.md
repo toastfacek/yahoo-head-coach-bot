@@ -222,6 +222,66 @@ This roadmap outlines the key milestones and tasks required to ship the Minimum 
 
 **Goal:** Transform the basic MVP into a sophisticated fantasy football assistant with advanced reasoning, comprehensive data sources, and persistent memory capabilities.
 
+### Milestone 7.5: Rube MCP Integration - Data Enhancement Layer ⚡
+
+**Goal:** Replace mock external data services with live sources via Rube MCP while preserving HeadCoach's strategic reasoning capabilities.
+**Status:** ✅ COMPLETED - Enhanced data foundation implemented and tested
+
+**Approach:** Integrate Rube MCP's 500+ tools to enhance data gathering without replacing the core fantasy football intelligence. HeadCoach remains the strategic reasoner with significantly upgraded data inputs.
+
+| Task                                    | Status      | Dependencies       |
+| --------------------------------------- | ----------- | ------------------ |
+| **7.5.1: Live Data Foundation**         | ✅ Done     | M3 (Core Agent)    |
+| - Replace weather stubs with live APIs  | ✅ Done     | 7.5.1             |
+| - Add sportsbook tools for Vegas lines  | ✅ Done     | 7.5.1             |
+| - Test data quality and error handling  | ✅ Done     | 7.5.1             |
+| **7.5.2: Social Intelligence Layer**    | ✅ Done     | 7.5.1             |
+| - Add Reddit search for injury intel    | ✅ Done     | 7.5.2             |
+| - Integrate web search for beat reporters | ✅ Done   | 7.5.2             |
+| - Enhance scout tool with social data   | ✅ Done     | 7.5.2             |
+| **7.5.3: Advanced Data Fusion**         | ✅ Done     | 7.5.2             |
+| - Enhance analyst with breaking news    | ✅ Done     | 7.5.3             |
+| - Add trend analysis for waiver targets | ✅ Done     | 7.5.3             |
+| - Implement parallel data execution     | ✅ Done     | 7.5.3             |
+| **7.5.4: Testing & Optimization**       | ✅ Done     | 7.5.3             |
+| - End-to-end testing with live data    | ✅ Done     | 7.5.4             |
+| - Performance optimization             | ✅ Done     | 7.5.4             |
+| - Documentation updates                | ✅ Done     | 7.5.4             |
+
+**Architecture:** 
+```
+HeadCoach (Strategic Reasoner) - PRESERVED
+    ↓
+Enhanced Scout (Yahoo API + Rube Social Intel) - ENHANCED
+    ↓  
+Analyst (Existing Logic + Richer Context) - ENHANCED
+    ↓
+Executor (Existing Policy Engine) - PRESERVED
+    ↓
+Historian (Existing Audit Trail) - PRESERVED
+```
+
+**Key Tools:**
+- `REDDIT_SEARCH_ACROSS_SUBREDDITS` - Player injury discussions
+- `WEB_SEARCH` - Beat reporter news and trends  
+- Weather APIs - Live game conditions
+- Sportsbook tools - Real betting odds and totals
+- `RUBE_REMOTE_WORKBENCH` - Parallel data processing
+
+**Benefits:**
+- Real-time social sentiment replaces mock data
+- Live weather/Vegas data for game script analysis
+- Enhanced decision-making through richer context
+- Maintained fantasy football intelligence and reasoning
+- Simplified maintenance through managed API integrations
+
+**Acceptance Criteria:**
+- ExternalDataService stubs replaced with live Rube data sources
+- Social intelligence (Reddit/web) integrated into scout tool
+- Weather and betting data flowing into analyst recommendations
+- All existing HeadCoach reasoning and confidence scoring preserved
+- Performance meets or exceeds current mock data response times
+
 ### Milestone 8: Analyst Sub-Agent & Advanced Reasoning
 
 **Goal:** Implement a dedicated Analyst sub-agent for complex analysis tasks and enhance the existing tool architecture.

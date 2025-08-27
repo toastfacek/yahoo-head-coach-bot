@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DecisionTrace",
+  "type": "object",
+  "required": [
+    "decision_type",
+    "player_id",
+    "week",
+    "expected_delta_pts",
+    "evidence_links"
+  ],
+  "properties": {
+    "decision_type": {
+      "type": "string",
+      "enum": [
+        "expendable",
+        "waiver",
+        "fab_bid",
+        "start_sit"
+      ]
+    },
+    "player_id": {
+      "type": "string"
+    },
+    "week": {
+      "type": "integer"
+    },
+    "expected_delta_pts": {
+      "type": "number"
+    },
+    "rationale": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_links": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

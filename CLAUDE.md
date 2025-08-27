@@ -112,6 +112,76 @@ AI_MODEL=claude-3-5-sonnet-20241022
 **Testing OAuth Flow:**
 Visit `http://localhost:3000/api/oauth/start?userId=dev` to test Yahoo OAuth integration.
 
+## OAuth Development Troubleshooting
+
+### Complete Authentication Flow Issues (Fixed Session)
+
+**Problem**: TypeScript compilation memory errors prevented normal development server startup, and Yahoo OAuth authentication wasn't working properly in the Streamlit UI.
+
+**Root Cause Analysis:**
+1. **Memory Issues**: `npm run dev` crashed with heap out of memory errors due to large codebase TypeScript compilation
+2. **Authentication Modal Blocking**: Modal interface prevented user interaction with auth flow
+3. **API Endpoint Mismatches**: Streamlit expected different endpoint names than server provided
+4. **Yahoo API Data Structure**: Complex nested array format not parsed correctly
+5. **Missing Data Fields**: Streamlit UI expected `points` field that wasn't provided
+
+**Solution: Quick Development Server**
+Created minimal OAuth server (`apps/orchestrator/simple-server.js`) that bypasses TypeScript compilation:
+
+```javascript
+// Complete OAuth flow with token storage
+app.get('/api/oauth/start', (req, res) => { /* Yahoo OAuth redirect */ });
+app.get('/api/oauth/callback', async (req, res) => { /* Token exchange */ });
+app.get('/api/oauth/status', (req, res) => { /* Check auth status */ });
+
+// Yahoo Fantasy API integration  
+app.get('/api/leagues', async (req, res) => { /* Fetch user leagues */ });
+app.get('/api/team/stats', async (req, res) => { /* Fetch league standings */ });
+app.get('/api/team/roster', async (req, res) => { /* Fetch user roster */ });
+```
+
+**Yahoo API Data Structure Discoveries:**
+- **Game Keys**: Must use `nfl.l.{leagueId}` not just `{leagueId}` 
+- **Teams**: Nested arrays `teamData.team[0]` where each array element is a single-key object
+- **Team Ownership**: `is_owned_by_current_login: 1` (number, not string)
+- **Players**: Triple nested structure:
+  ```javascript
+  playerData.player[0] = [/* array of info objects */]
+  playerData.player[1] = { selected_position: [/* position objects */] }
+  ```
+
+**Endpoint Format Requirements:**
+- Teams: `GET /api/team/stats?userId=X&leagueId=Y` → `{ teams: [...] }`
+- Roster: `GET /api/team/roster?userId=X&leagueId=Y` → `{ starters: [...], players: [...] }`  
+- Leagues: `GET /api/leagues?userId=X` → `{ leagues: [{ id, name }] }`
+- All player objects must include `points` field (even if 0) to prevent Streamlit KeyError
+
+**Authentication Flow Fixes:**
+1. **Removed blocking modal** - replaced with direct auth links
+2. **Fixed endpoint naming** - matched Streamlit expectations exactly  
+3. **Corrected Yahoo API calls** - used proper game key format
+4. **Enhanced data parsing** - handled complex nested Yahoo response structure
+5. **Added missing fields** - included `points: 0` to prevent UI crashes
+
+**Ngrok Development Workflow:**
+```bash
+# Start ngrok tunnel
+ngrok http 3000
+
+# Update 3 locations with new URL:
+# 1. .env: YAHOO_REDIRECT_URI=https://abc123.ngrok-free.app/api/oauth/callback  
+# 2. Yahoo Developer Console: Redirect URI setting
+# 3. apps/ui/app.py: API_BASE constant
+
+# Start simple server
+node simple-server.js
+
+# Start Streamlit UI  
+streamlit run apps/ui/app.py
+```
+
+**Result**: Full end-to-end OAuth authentication with real Yahoo Fantasy data display in Streamlit dashboard.
+
 ## Important Files
 
 - `ROADMAP.md` - Current development status and task tracking

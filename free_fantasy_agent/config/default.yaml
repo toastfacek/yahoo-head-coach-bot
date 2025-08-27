@@ -1,0 +1,29 @@
+# config/default.yaml
+league:
+  provider: "yahoo"   # or "sleeper"
+  league_id: "REPLACE_ME"
+  scoring:
+    # example half-PPR weights (override per league)
+    pass_yds: 0.04
+    pass_td: 4
+    int: -2
+    rush_yds: 0.1
+    rush_td: 6
+    rec: 0.5
+    rec_yds: 0.1
+    rec_td: 6
+    fum: -2
+  roster_slots:
+    QB: 1
+    RB: 2
+    WR: 2
+    TE: 1
+    FLEX: 1
+    DST: 1
+    K: 1
+  fab_budget: 100
+paths:
+  cache_dir: "./.cache"
+flags:
+  use_weather: true
+  use_lines: true

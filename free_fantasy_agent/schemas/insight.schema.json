@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Insight",
+  "type": "object",
+  "required": [
+    "player_key",
+    "claim_type",
+    "evidence",
+    "source",
+    "timestamp",
+    "confidence"
+  ],
+  "properties": {
+    "player_key": {
+      "type": "string"
+    },
+    "claim_type": {
+      "type": "string",
+      "enum": [
+        "start_sit",
+        "injury",
+        "usage",
+        "waiver",
+        "weather",
+        "matchup"
+      ]
+    },
+    "stance": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "start",
+        "sit",
+        "add",
+        "drop",
+        "upgrade",
+        "downgrade",
+        null
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "name",
+        "url"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    }
+  }
+}

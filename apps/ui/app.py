@@ -6,6 +6,18 @@ from datetime import datetime
 
 API_BASE = st.secrets.get("API_BASE", "http://localhost:3000/api")
 
+# Show connection status in sidebar
+st.sidebar.markdown("### 🔗 Server Status")
+try:
+    health_response = requests.get(f"{API_BASE}/health", timeout=3)
+    if health_response.status_code == 200:
+        st.sidebar.success("✅ Server Connected")
+    else:
+        st.sidebar.error("❌ Server Error") 
+except:
+    st.sidebar.warning("⏳ Server Starting...")
+    st.sidebar.markdown(f"**Direct Auth URL:** {API_BASE}/oauth/start?userId=dev")
+
 st.set_page_config(
     page_title="Fantasy HeadCoach", 
     page_icon="🏈",
@@ -20,6 +32,22 @@ st.markdown("""
     .css-1jc7ptx, .e1ewe7hr3, .viewerBadge_container__1QSob,
     .styles_viewerBadge__1yB5_, #MainMenu, header, footer {
         visibility: hidden;
+    }
+    
+    /* Force sidebar to always be visible and disable collapse */
+    [data-testid="stSidebar"] {
+        display: block !important;
+        width: 21rem !important;
+        min-width: 21rem !important;
+        transform: translateX(0) !important;
+    }
+    
+    /* Hide all sidebar collapse/expand buttons */
+    [data-testid="stSidebar"] button[kind="headerNoPadding"],
+    [data-testid="collapsedControl"],
+    .css-1lcbmhc button,
+    .sidebar-nav-link {
+        display: none !important;
     }
     
     /* Main background */
@@ -231,31 +259,6 @@ st.markdown("""
         background: #2563EB !important;
     }
     
-    /* Floating expand button as backup */
-    .floating-expand-btn {
-        position: fixed;
-        top: 20px;
-        left: 10px;
-        z-index: 999999;
-        background: #3B82F6;
-        color: white;
-        border: none;
-        border-radius: 0 8px 8px 0;
-        padding: 8px 12px;
-        cursor: pointer;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        font-size: 16px;
-        display: none;
-    }
-    
-    .floating-expand-btn:hover {
-        background: #2563EB;
-    }
-    
-    /* Show floating button when sidebar is collapsed */
-    .css-1lcbmhc.css-12ttj6m ~ .main .floating-expand-btn {
-        display: block;
-    }
     
     /* Status indicators */
     .status-indicator {
@@ -282,77 +285,187 @@ st.markdown("""
         background: #FEE2E2;
         color: #991B1B;
     }
+    
+    /* Persistent Chat Sidebar Styles */
+    .chat-container {
+        position: fixed;
+        right: 0;
+        top: 0;
+        height: 100vh;
+        z-index: 1000;
+        transition: transform 0.3s ease;
+        background: white;
+        border-left: 1px solid #E5E7EB;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .chat-container.collapsed {
+        transform: translateX(calc(100% - 50px));
+        width: 350px;
+    }
+    
+    .chat-container.expanded {
+        transform: translateX(0);
+        width: 350px;
+    }
+    
+    .chat-toggle-button {
+        position: absolute;
+        left: -40px;
+        top: 20px;
+        width: 40px;
+        height: 40px;
+        background: #10B981;
+        color: white;
+        border: none;
+        border-radius: 8px 0 0 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        transition: background-color 0.2s;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .chat-toggle-button:hover {
+        background: #059669;
+    }
+    
+    .chat-header {
+        background: #10B981;
+        color: white;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #E5E7EB;
+        flex-shrink: 0;
+    }
+    
+    .chat-title {
+        font-weight: 600;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .chat-messages {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        background: #FAFAFA;
+    }
+    
+    .chat-message {
+        max-width: 80%;
+        padding: 0.75rem 1rem;
+        border-radius: 1rem;
+        word-wrap: break-word;
+    }
+    
+    .chat-message.user {
+        align-self: flex-end;
+        background: #10B981;
+        color: white;
+        border-bottom-right-radius: 0.25rem;
+    }
+    
+    .chat-message.agent {
+        align-self: flex-start;
+        background: white;
+        color: #374151;
+        border: 1px solid #E5E7EB;
+        border-bottom-left-radius: 0.25rem;
+    }
+    
+    .chat-input-container {
+        padding: 1rem;
+        border-top: 1px solid #E5E7EB;
+        background: white;
+        flex-shrink: 0;
+    }
+    
+    .chat-input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #D1D5DB;
+        border-radius: 0.5rem;
+        outline: none;
+        font-size: 0.875rem;
+        resize: none;
+    }
+    
+    .chat-input:focus {
+        border-color: #10B981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+    
+    .chat-send-button {
+        margin-top: 0.5rem;
+        width: 100%;
+        padding: 0.75rem;
+        background: #10B981;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+    
+    .chat-send-button:hover {
+        background: #059669;
+    }
+    
+    .chat-send-button:disabled {
+        background: #9CA3AF;
+        cursor: not-allowed;
+    }
+    
+    .chat-typing {
+        align-self: flex-start;
+        background: white;
+        border: 1px solid #E5E7EB;
+        border-radius: 1rem;
+        border-bottom-left-radius: 0.25rem;
+        padding: 0.75rem 1rem;
+        color: #6B7280;
+        font-style: italic;
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+        .chat-container {
+            width: 100vw !important;
+        }
+        
+        .chat-container.collapsed {
+            transform: translateX(calc(100% - 40px));
+        }
+        
+        .chat-toggle-button {
+            left: -35px;
+            width: 35px;
+            height: 35px;
+            font-size: 1rem;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Add floating expand button with JavaScript
-st.markdown("""
-<div class="floating-expand-btn" onclick="expandSidebar()">☰</div>
-
-<script>
-function expandSidebar() {
-    // Try multiple methods to expand the sidebar
-    
-    // Method 1: Click the Streamlit collapse button
-    const collapseBtn = document.querySelector('[data-testid="collapsedControl"]');
-    if (collapseBtn) {
-        collapseBtn.click();
-        return;
-    }
-    
-    // Method 2: Try other Streamlit sidebar toggle selectors
-    const toggleSelectors = [
-        '.css-1lcbmhc .css-1outpf7',
-        '.css-1cpxqw2',
-        '[aria-label="Open sidebar"]',
-        '.sidebar-toggle',
-        '.css-1lcbmhc button'
-    ];
-    
-    for (const selector of toggleSelectors) {
-        const btn = document.querySelector(selector);
-        if (btn) {
-            btn.click();
-            return;
-        }
-    }
-    
-    // Method 3: Force show sidebar by manipulating classes
-    const sidebar = document.querySelector('.css-1lcbmhc');
-    if (sidebar && sidebar.classList.contains('css-12ttj6m')) {
-        sidebar.classList.remove('css-12ttj6m');
-    }
-    
-    // Hide the floating button after expanding
-    setTimeout(() => {
-        const floatingBtn = document.querySelector('.floating-expand-btn');
-        if (floatingBtn) floatingBtn.style.display = 'none';
-    }, 100);
-}
-
-// Auto-detect when sidebar is collapsed and show floating button
-function checkSidebarState() {
-    const sidebar = document.querySelector('.css-1lcbmhc');
-    const floatingBtn = document.querySelector('.floating-expand-btn');
-    
-    if (sidebar && floatingBtn) {
-        if (sidebar.classList.contains('css-12ttj6m')) {
-            // Sidebar is collapsed
-            floatingBtn.style.display = 'block';
-        } else {
-            // Sidebar is expanded  
-            floatingBtn.style.display = 'none';
-        }
-    }
-}
-
-// Check sidebar state periodically
-setInterval(checkSidebarState, 500);
-
-// Initial check
-setTimeout(checkSidebarState, 1000);
-</script>
-""", unsafe_allow_html=True)
 
 # Initialize session state
 if 'user_id' not in st.session_state:
@@ -361,6 +474,16 @@ if 'league_id' not in st.session_state:
     st.session_state['league_id'] = ''
 if 'current_page' not in st.session_state:
     st.session_state['current_page'] = 'Dashboard'
+
+# Chat sidebar session state
+if 'chat_expanded' not in st.session_state:
+    st.session_state['chat_expanded'] = False
+if 'chat_messages' not in st.session_state:
+    st.session_state['chat_messages'] = []
+if 'chat_input' not in st.session_state:
+    st.session_state['chat_input'] = ''
+if 'chat_processing' not in st.session_state:
+    st.session_state['chat_processing'] = False
 
 # Sidebar Navigation
 with st.sidebar:
@@ -391,10 +514,37 @@ with st.sidebar:
             expires_in = oauth_status.get('expiresInSeconds', 0)
             if expires_in > 0:
                 st.caption(f"Expires in {expires_in // 60}m")
+                
+                # Show refresh button if token expires soon (< 1 hour)
+                if expires_in < 3600:
+                    if st.button("🔄 Refresh Token", use_container_width=True, help="Refresh your Yahoo authentication"):
+                        try:
+                            refresh_response = requests.get(f"{API_BASE}/oauth/refresh", 
+                                                           params={"userId": st.session_state['user_id']}, 
+                                                           timeout=10)
+                            if refresh_response.status_code == 200:
+                                st.success("✅ Token refreshed successfully!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to refresh token. Please reconnect.")
+                        except Exception as e:
+                            st.error(f"❌ Refresh failed: {str(e)}")
         else:
             st.markdown('<div class="status-indicator error">❌ Disconnected</div>', unsafe_allow_html=True)
             if st.button("🔗 Connect Yahoo", use_container_width=True):
-                st.markdown(f"[Click here to authenticate]({API_BASE}/oauth/start?userId={st.session_state['user_id']})")
+                # Store the auth URL in session state and show instructions
+                auth_url = f"{API_BASE}/oauth/start?userId={st.session_state['user_id']}"
+                st.markdown(f"[🚀 **Click here to authenticate with Yahoo**]({auth_url})")
+                st.info("Open the link above in a new tab, complete authentication, then refresh this page.")
+    except Exception as e:
+        st.markdown('<div class="status-indicator error">❌ Auth Error</div>', unsafe_allow_html=True)
+        if st.button("🔄 Reconnect", use_container_width=True, help="Reconnect to Yahoo Fantasy"):
+            # Force reconnection flow
+            auth_url = f"{API_BASE}/oauth/start?userId={st.session_state['user_id']}"
+            st.session_state['auth_url'] = auth_url  
+            st.session_state['show_auth_modal'] = True
+            st.rerun()
+        st.caption("Connection issue - click to reconnect")
     except:
         st.markdown('<div class="status-indicator error">❌ Server Error</div>', unsafe_allow_html=True)
     
@@ -461,13 +611,160 @@ with st.sidebar:
 # Store league_selected in session state for main content
 st.session_state['league_selected'] = league_selected
 
+# Modal removed - direct authentication links only
+if False:  # Disabled modal
+    st.markdown("""
+    <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    ">
+        <div style="
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        ">
+            <h3 style="margin-top: 0; color: #1F2937;">🔐 Yahoo Fantasy Authentication</h3>
+            <p style="color: #6B7280; margin-bottom: 1.5rem;">
+                To access your fantasy football data, you need to authenticate with Yahoo Fantasy Sports.
+                This is secure and only grants access to your fantasy teams.
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Create columns for the modal content
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("### 🔐 Yahoo Fantasy Authentication")
+        st.markdown("""
+        **Steps to connect:**
+        1. Click the button below to open Yahoo authentication
+        2. Log in with your Yahoo credentials  
+        3. Grant permission to access your fantasy data
+        4. Return to this page once complete
+        """)
+        
+        # Authentication button
+        auth_url = st.session_state.get('auth_url', f"{API_BASE}/oauth/start?userId={st.session_state['user_id']}")
+        
+        if st.button("🚀 Authenticate with Yahoo", use_container_width=True, type="primary"):
+            st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
+            st.markdown(f"**Click here if not redirected:** [{auth_url}]({auth_url})")
+        
+        # Also show as a clickable link
+        st.markdown(f"""
+        <div style="text-align: center; margin: 1rem 0;">
+            <a href="{auth_url}" target="_blank" style="
+                display: inline-block;
+                background: #720E9E;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                text-decoration: none;
+                font-weight: 600;
+            ">🚀 Open Yahoo Authentication</a>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        st.markdown("**After authenticating with Yahoo:**")
+        st.info("✨ Once you complete authentication, this page will automatically refresh and show your fantasy data!")
+        
+        # Auto-check authentication status every few seconds
+        st.markdown("""
+        <script>
+            // Auto-refresh to check authentication status
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000); // Refresh every 5 seconds to check auth status
+        </script>
+        """, unsafe_allow_html=True)
+        
+        # Manual buttons
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if st.button("✅ I've completed authentication", use_container_width=True):
+                st.session_state['show_auth_modal'] = False
+                st.rerun()
+        
+        with col_b:
+            if st.button("❌ Cancel", use_container_width=True):
+                st.session_state['show_auth_modal'] = False
+                st.rerun()
+                
+    # Add a note about the authentication modal being open
+    st.stop()  # Prevent the rest of the page from rendering
+
 # Main content based on selected page
 if st.session_state['current_page'] == 'Dashboard':
     # Get league selection status from sidebar
     league_selected = st.session_state.get('league_selected', False)
 
-    # Only show dashboard content if we have a league selected
-    if league_selected and st.session_state.get('league_id'):
+    # Check authentication status for main dashboard
+    try:
+        oauth_status = requests.get(f"{API_BASE}/oauth/status", params={"userId": st.session_state['user_id']}, timeout=5).json()
+        is_authenticated = oauth_status.get("hasToken", False)
+    except:
+        is_authenticated = False
+    
+    # Show authentication prompt if not authenticated
+    if not is_authenticated:
+        st.markdown("""
+        <div style="text-align: center; padding: 3rem 1rem; background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-radius: 1rem; margin: 2rem 0;">
+            <h2 style="color: #92400E; margin-bottom: 1rem;">🔐 Connect Your Yahoo Fantasy Account</h2>
+            <p style="color: #78350F; font-size: 1.1rem; margin-bottom: 2rem;">
+                To get started with your HeadCoach assistant, connect your Yahoo Fantasy Football account.
+                This allows us to analyze your team and provide personalized recommendations.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Authentication button prominently displayed
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🚀 Connect Yahoo Fantasy Account", 
+                        use_container_width=True, 
+                        type="primary",
+                        help="Secure authentication with Yahoo Fantasy Sports"):
+                auth_url = f"{API_BASE}/oauth/start?userId={st.session_state['user_id']}"
+                st.markdown(f"[🚀 **Click here to authenticate with Yahoo**]({auth_url})")
+                st.info("Open the link above in a new tab, complete authentication, then refresh this page.")
+        
+        # Add some helpful information
+        st.markdown("---")
+        st.markdown("""
+        ### ❓ What happens when you connect?
+        
+        **Secure & Safe:**
+        - Uses Yahoo's official OAuth system
+        - Only accesses your fantasy football data
+        - No access to email, passwords, or personal information
+        - Can be revoked anytime from your Yahoo account settings
+        
+        **What you'll get:**
+        - Real-time roster analysis and injury updates
+        - Personalized waiver wire recommendations  
+        - Lineup optimization suggestions
+        - Chat with your AI HeadCoach assistant
+        - Automated decision-making based on your preferences
+        """)
+        
+        st.stop()  # Exit early if not authenticated
+
+    # Only show dashboard content if we have a league selected  
+    elif league_selected and st.session_state.get('league_id'):
         # Loading state for dashboard data
         with st.spinner("Loading your fantasy dashboard..."):
             # Fetch team statistics
@@ -804,4 +1101,272 @@ elif st.session_state['current_page'] == 'Analysis':
 elif st.session_state['current_page'] == 'Strategy':
     st.title("🎯 Strategy & Planning")
     st.info("Strategic planning tools coming soon...")
+
+# Chat message handling function
+def send_chat_message(message: str, league_id: str, current_page: str):
+    """Send message to HeadCoach and get streaming response"""
+    if not message.strip():
+        return
+        
+    # Add user message to chat history
+    st.session_state['chat_messages'].append({
+        'sender': 'user',
+        'content': message.strip(),
+        'timestamp': time.time()
+    })
+    
+    try:
+        # Set processing state
+        st.session_state['chat_processing'] = True
+        
+        # Send message to chat API
+        response = requests.post(f"{API_BASE}/chat", 
+            json={
+                "message": message,
+                "leagueId": league_id,
+                "userId": st.session_state.get('user_id', 'dev'),
+                "currentPage": current_page
+            },
+            headers={'Content-Type': 'application/json'},
+            stream=True,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            # Process Server-Sent Events streaming response
+            agent_response = ""
+            for line in response.iter_lines():
+                if line:
+                    line_text = line.decode('utf-8')
+                    if line_text.startswith('data: '):
+                        try:
+                            import json
+                            data_json = line_text[6:]  # Remove 'data: ' prefix
+                            if data_json.strip():
+                                data = json.loads(data_json)
+                                if isinstance(data, dict) and 'content' in data:
+                                    agent_response += data['content']
+                        except json.JSONDecodeError:
+                            # Handle non-JSON data (fallback)
+                            chunk = line_text[6:] if line_text.startswith('data: ') else line_text
+                            if chunk.strip() and chunk not in ['[DONE]', '{"status": "connected", "message": "HeadCoach is thinking..."}']:
+                                agent_response += chunk
+            
+            # Add agent response to chat history
+            if agent_response.strip():
+                st.session_state['chat_messages'].append({
+                    'sender': 'agent', 
+                    'content': agent_response.strip(),
+                    'timestamp': time.time()
+                })
+        else:
+            # Handle error response
+            st.session_state['chat_messages'].append({
+                'sender': 'agent',
+                'content': f'Sorry, I encountered an error processing your request. Please try again.',
+                'timestamp': time.time()
+            })
+            
+    except Exception as e:
+        st.session_state['chat_messages'].append({
+            'sender': 'agent',
+            'content': f'Sorry, I couldn\'t process your message right now: {str(e)}',
+            'timestamp': time.time()
+        })
+    finally:
+        # Clear processing state
+        st.session_state['chat_processing'] = False
+
+# Persistent Chat Sidebar - Streamlit native implementation
+def render_chat_sidebar():
+    """Render chat sidebar with Streamlit components in a container"""
+    
+    # Create fixed chat toggle button
+    st.markdown(f"""
+    <div style="
+        position: fixed; 
+        right: 20px; 
+        top: 20px; 
+        z-index: 999;
+        background: #10B981;
+        color: white;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transition: all 0.2s ease;
+    " onclick="document.getElementById('chat-toggle-hidden').click();" 
+       onmouseover="this.style.background='#059669'"
+       onmouseout="this.style.background='#10B981'">
+        {'✕' if st.session_state.get('chat_expanded', False) else '💬'}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Hidden Streamlit button for state management
+    if st.button("Toggle Chat", key="chat-toggle-hidden", help="Chat with HeadCoach",
+                type="primary" if not st.session_state.get('chat_expanded', False) else "secondary"):
+        st.session_state['chat_expanded'] = not st.session_state.get('chat_expanded', False)
+        st.rerun()
+    
+    # Hide the actual Streamlit button with CSS
+    st.markdown("""
+    <style>
+        button[data-testid="stButton"][key="chat-toggle-hidden"] {
+            display: none !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Render expanded chat interface if toggled open
+    if st.session_state.get('chat_expanded', False):
+        with st.container():
+            st.markdown("""
+            <style>
+                @media (max-width: 768px) {
+                    .chat-sidebar {
+                        width: 100vw !important;
+                        height: 100vh !important;
+                    }
+                }
+            </style>
+            <div class="chat-sidebar" style="
+                position: fixed; 
+                right: 0; 
+                top: 0; 
+                height: 100vh; 
+                width: 350px; 
+                background: white; 
+                border-left: 1px solid #E5E7EB; 
+                box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1); 
+                z-index: 1000; 
+                display: flex; 
+                flex-direction: column;
+            ">
+                <div style="
+                    background: #10B981; 
+                    color: white; 
+                    padding: 1rem; 
+                    font-weight: 600;
+                    border-bottom: 1px solid #E5E7EB;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                ">
+                    <span>🤖 HeadCoach Assistant</span>
+                    <small style="opacity: 0.8;">
+                        {st.session_state.get('current_page', 'Dashboard')}
+                    </small>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Chat messages container with fixed positioning
+            messages_container = st.container()
+            with messages_container:
+                st.markdown('<div style="position: fixed; right: 0; top: 60px; width: 350px; height: calc(100vh - 140px); overflow-y: auto; padding: 1rem; background: #FAFAFA; z-index: 1001;">', unsafe_allow_html=True)
+                
+                # Display chat messages
+                for message in st.session_state.get('chat_messages', []):
+                    if message['sender'] == 'user':
+                        st.markdown(f"""
+                        <div style="
+                            background: #10B981; 
+                            color: white; 
+                            padding: 0.75rem 1rem; 
+                            border-radius: 1rem; 
+                            margin: 0.5rem 0; 
+                            margin-left: 20%; 
+                            border-bottom-right-radius: 0.25rem;
+                        ">
+                            {message['content']}
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        <div style="
+                            background: white; 
+                            color: #374151; 
+                            padding: 0.75rem 1rem; 
+                            border-radius: 1rem; 
+                            margin: 0.5rem 0; 
+                            margin-right: 20%; 
+                            border: 1px solid #E5E7EB;
+                            border-bottom-left-radius: 0.25rem;
+                        ">
+                            {message['content']}
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                # Show typing indicator if processing
+                if st.session_state.get('chat_processing', False):
+                    st.markdown("""
+                    <div style="
+                        background: white; 
+                        color: #6B7280; 
+                        padding: 0.75rem 1rem; 
+                        border-radius: 1rem; 
+                        margin: 0.5rem 0; 
+                        margin-right: 20%; 
+                        border: 1px solid #E5E7EB;
+                        font-style: italic;
+                        animation: pulse 1.5s ease-in-out infinite;
+                    ">
+                        HeadCoach is thinking...
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Chat input at the bottom
+            st.markdown('<div style="position: fixed; right: 0; bottom: 0; width: 350px; background: white; border-top: 1px solid #E5E7EB; padding: 1rem; z-index: 1001;">', unsafe_allow_html=True)
+            
+            # Chat input form
+            with st.form("chat_form", clear_on_submit=True):
+                user_message = st.text_area(
+                    "Message HeadCoach...", 
+                    placeholder="Ask about your lineup, waivers, or anything fantasy football...",
+                    max_chars=500,
+                    height=60,
+                    key="chat_input_field",
+                    disabled=st.session_state.get('chat_processing', False)
+                )
+                
+                submitted = st.form_submit_button(
+                    "Send Message" if not st.session_state.get('chat_processing', False) else "Processing...",
+                    disabled=st.session_state.get('chat_processing', False),
+                    use_container_width=True
+                )
+                
+                if submitted and user_message.strip() and st.session_state.get('league_id'):
+                    # Process the chat message
+                    send_chat_message(
+                        user_message, 
+                        st.session_state.get('league_id', ''),
+                        st.session_state.get('current_page', 'Dashboard')
+                    )
+                    st.rerun()
+                elif submitted and not st.session_state.get('league_id'):
+                    st.error("Please select a league first to chat with HeadCoach!")
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+    
+    return None  # No HTML to return since we use Streamlit components
+
+# Handle chat initialization
+
+# Add welcome message if chat is empty
+if len(st.session_state.get('chat_messages', [])) == 0:
+    st.session_state['chat_messages'] = [{
+        'sender': 'agent',
+        'content': f'👋 Hi! I\'m your HeadCoach assistant. I can help you with lineup decisions, waiver wire picks, and fantasy football strategy. Currently viewing: **{st.session_state.get("current_page", "Dashboard")}**\n\nTry asking me:\n- "Should I start Player X this week?"\n- "Who should I pick up from waivers?"\n- "How does my team look?"',
+        'timestamp': time.time()
+    }]
+
+# Render the persistent chat sidebar
+render_chat_sidebar()
 

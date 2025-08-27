@@ -1,14 +1,15 @@
+// Load environment variables first, before any other imports
+import dotenv from 'dotenv';
+dotenv.config({ path: '../../.env' });
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
 import router from './routes';
 import { env, allowedOrigins } from './config/env';
-
-// Load environment variables
-dotenv.config();
+import { connectDatabase, getDatabaseHealth, disconnectDatabase } from './db';
 
 const app = express();
 const PORT = Number(env.PORT || 3000);
@@ -68,28 +69,57 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
   });
 });
 
-// Graceful shutdown handling
-const server = app.listen(PORT, () => {
-  console.log(`🚀 HeadCoach Orchestrator server running on port ${PORT}`);
-  console.log(`📊 Health check available at: http://localhost:${PORT}/api/health`);
-  console.log(`📈 Environment: ${env.NODE_ENV} | Model: ${env.AI_MODEL} | Mode: ${env.EXECUTION_MODE}`);
-});
+// Initialize database and start server
+async function startServer() {
+  try {
+    console.log('🔄 Connecting to database...');
+    await connectDatabase();
+    
+    // Test database health
+    const health = await getDatabaseHealth();
+    if (health.healthy) {
+      console.log(`✅ Database connection healthy (${health.latency}ms latency)`);
+    } else {
+      console.warn(`⚠️  Database connection unhealthy: ${health.error}`);
+    }
+  } catch (error) {
+    console.error('❌ Database connection failed:', error);
+    console.log('📝 Server will continue with limited functionality');
+  }
 
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    console.log('Process terminated');
-    process.exit(0);
+  // Start HTTP server
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 HeadCoach Orchestrator server running on port ${PORT}`);
+    console.log(`📊 Health check available at: http://localhost:${PORT}/api/health`);
+    console.log(`📈 Environment: ${env.NODE_ENV} | Model: ${env.AI_MODEL} | Mode: ${env.EXECUTION_MODE}`);
   });
-});
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully...');
-  server.close(() => {
-    console.log('Process terminated');
-    process.exit(0);
+  return server;
+}
+
+startServer().then(server => {
+
+  // Handle graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    await disconnectDatabase();
+    server.close(() => {
+      console.log('Process terminated');
+      process.exit(0);
+    });
   });
+
+  process.on('SIGINT', async () => {
+    console.log('SIGINT received, shutting down gracefully...');
+    await disconnectDatabase();
+    server.close(() => {
+      console.log('Process terminated');
+      process.exit(0);
+    });
+  });
+}).catch(error => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });
 
 export default app;

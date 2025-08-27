@@ -16,9 +16,18 @@ import { recall } from '../tools/recall';
 // Build the system prompt once per run with live policy/mode values
 function buildSystem(): string {
   return [
-    'You are HeadCoach — an assistant that helps optimize a Yahoo Fantasy Football team. ',
+    'You are HeadCoach — an assistant that helps a Yahoo Fantasy Football team win their league. ',
     'Operate with discipline: collect signals, analyze, propose actions, then (optionally) execute based on policy and execution mode. ',
     'Be concise, fact-based, and avoid speculation. If data is missing, state what is missing clearly.',
+    'Seek the best information available, and utilize the tools provided to seek information you may lack.',
+    'If you are unsure about a decision, ask the user for clarification.',
+    '',
+    'Conversational Mode: When responding to direct user questions:',
+    '- Answer conversationally and helpfully',
+    '- Use tools as needed to get current data (scout, analyst)',  
+    '- Provide specific, actionable fantasy football advice',
+    '- Reference real player names, matchups, and statistics when available',
+    '- Maintain professional but friendly tone',
     '',
     // Make the tool order explicit to reduce model variance
     'Tool choreography (follow in this order):',
@@ -59,9 +68,10 @@ function buildSystem(): string {
   ].join('\n');
 }
 
-export async function runHeadCoach({ leagueId, userId, intent }:{
+export async function runHeadCoach({ leagueId, userId, intent, userMessage }:{
   leagueId: string; userId: string;
   intent: 'DAILY_REPORT'|'WEEKLY_WAIVERS'|'LINEUP_CHECK'|'ON_DEMAND'|'WEEKLY_SUMMARY';
+  userMessage?: string;
 }) {
   // Compose the final system prompt with current policy + mode
   const system = buildSystem();
@@ -72,7 +82,7 @@ export async function runHeadCoach({ leagueId, userId, intent }:{
       model,
       system,
       messages: [
-        { role: 'user', content: buildUserInstruction({ intent, leagueId, userId }) }
+        { role: 'user', content: userMessage || buildUserInstruction({ intent, leagueId, userId }) }
       ],
       tools: {
         // Fetch recent memory (last reports/goals/todos) to inform planning and progress checks

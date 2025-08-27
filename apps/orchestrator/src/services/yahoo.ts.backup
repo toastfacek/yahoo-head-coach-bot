@@ -1,0 +1,201 @@
+// Yahoo service helpers
+// - Wrap the yahoo-fantasy client with token refresh persistence
+// - Provide small utilities to derive keys and check league state
+import { prisma } from '../db';
+// @ts-ignore - No types available for yahoo-fantasy
+import YahooFantasy from 'yahoo-fantasy';
+import { env } from '../config/env';
+
+// Build a YahooFantasy client for a given user and persist refreshed tokens
+export async function yfForUser(userId: string) {
+  const tok = await prisma.yahooToken.findUnique({ where: { userId } });
+  if (!tok) throw new Error('Missing Yahoo token for user');
+
+  const onRefresh = async (tokenData: any) => {
+    try {
+      const expiresAt = tokenData.expires_in
+        ? new Date(Date.now() + tokenData.expires_in * 1000)
+        : new Date(Date.now() + 55 * 60 * 1000);
+      await prisma.yahooToken.update({
+        where: { userId },
+        data: {
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token ?? tok.refreshToken,
+          expiresAt,
+          tokenType: tokenData.token_type ?? tok.tokenType,
+          scope: tokenData.scope ?? tok.scope,
+        },
+      });
+    } catch (e) {
+      console.error('Failed to persist refreshed Yahoo tokens:', e);
+    }
+  };
+
+  const yf = new (YahooFantasy as any)(env.YAHOO_CLIENT_ID, env.YAHOO_CLIENT_SECRET, onRefresh, env.YAHOO_REDIRECT_URI);
+  yf.setUserToken(tok.accessToken);
+  yf.setRefreshToken(tok.refreshToken);
+  return yf as any;
+}
+
+// Resolve numeric → game_key (e.g., nfl)
+export async function getGameKey(yf: any, code = 'nfl'): Promise<string> {
+  const meta = await yf.game.meta(code);
+  return String(meta.game_key);
+}
+
+// Compose Yahoo league key from game + league id
+export function leagueKeyFor(gameKey: string, leagueId: string | number) {
+  return `${gameKey}.l.${leagueId}`;
+}
+
+// Find the authenticated user's team in this league
+export async function userTeamKey(yf: any, gameKey: string, leagueKey: string): Promise<string | null> {
+  const user = await yf.user.game_teams(gameKey);
+  const teams = user.teams || [];
+  const team = teams.find((t: any) => t.team_key && t.league_key === leagueKey);
+  return team ? String(team.team_key) : null;
+}
+
+// Check whether league has completed its draft
+export async function isLeaguePostDraft(yf: any, leagueKey: string): Promise<boolean> {
+  const meta = await yf.league.meta(leagueKey);
+  const draftStatus = (meta?.draft_status || meta?.league?.draft_status || '').toLowerCase();
+  return draftStatus === 'postdraft';
+}
+
+export async function stageActions(leagueId: string, actions: any[]) {
+  console.log('Stage actions called:', { leagueId, actions });
+  return { staged: true };
+}
+
+export async function callYahoo(action: any) {
+  console.log('Call Yahoo called with:', action);
+  
+  const { leagueKey, teamKey, action: actionData } = action;
+  
+  if (!leagueKey || !teamKey || !actionData) {
+    return { success: false, reason: 'MISSING_REQUIRED_PARAMS' };
+  }
+
+  try {
+    // Get Yahoo client from the action context (passed from executor)
+    const yf = action.yf;
+    
+    if (!yf) {
+      return { success: false, reason: 'MISSING_YAHOO_CLIENT' };
+    }
+
+    switch (actionData.type) {
+      case 'WAIVER':
+        return await executeWaiverClaim(yf, leagueKey, teamKey, actionData);
+      
+      case 'LINEUP_SWAP':
+        return await executeLineupChange(yf, leagueKey, teamKey, actionData);
+      
+      default:
+        return { success: false, reason: 'UNSUPPORTED_ACTION_TYPE' };
+    }
+  } catch (error: any) {
+    console.error('Yahoo API call error:', error);
+    return { 
+      success: false, 
+      reason: 'YAHOO_API_ERROR',
+      error: error.message 
+    };
+  }
+}
+
+// Execute waiver claim (add/drop transaction)
+async function executeWaiverClaim(yf: any, leagueKey: string, teamKey: string, actionData: any) {
+  const { addPlayerId, dropPlayerId, fabBid } = actionData;
+  
+  if (!addPlayerId) {
+    return { success: false, reason: 'MISSING_ADD_PLAYER_ID' };
+  }
+
+  try {
+    let transactionData;
+    
+    if (dropPlayerId) {
+      // Add/Drop transaction
+      transactionData = {
+        type: 'add_drop',
+        players: [
+          { player_key: addPlayerId, transaction_type: 'add' },
+          { player_key: dropPlayerId, transaction_type: 'drop' }
+        ]
+      };
+    } else {
+      // Add only (requires roster space)
+      transactionData = {
+        type: 'add',
+        players: [
+          { player_key: addPlayerId, transaction_type: 'add' }
+        ]
+      };
+    }
+
+    // Add FAB bid if specified
+    if (fabBid && fabBid > 0) {
+      (transactionData as any).faab_bid = fabBid;
+    }
+
+    // Execute the transaction
+    const result = await yf.team.transactions(teamKey).add(transactionData);
+    
+    if (result && result.transaction) {
+      return { 
+        success: true, 
+        transactionId: result.transaction.transaction_id,
+        details: result.transaction 
+      };
+    } else {
+      return { success: false, reason: 'TRANSACTION_FAILED', result };
+    }
+  } catch (error: any) {
+    console.error('Waiver claim execution error:', error);
+    return { 
+      success: false, 
+      reason: 'WAIVER_EXECUTION_ERROR', 
+      error: error.message 
+    };
+  }
+}
+
+// Execute lineup change (move players between positions)
+async function executeLineupChange(yf: any, leagueKey: string, teamKey: string, actionData: any) {
+  const { playerMoves } = actionData;
+  
+  if (!playerMoves || !Array.isArray(playerMoves) || playerMoves.length === 0) {
+    return { success: false, reason: 'MISSING_PLAYER_MOVES' };
+  }
+
+  try {
+    // Build roster position changes
+    const rosterChanges = playerMoves.map((move: any) => ({
+      player_key: move.playerId,
+      position: move.newPosition
+    }));
+
+    // Execute roster changes
+    const result = await yf.team.roster(teamKey).edit({
+      roster_moves: rosterChanges
+    });
+    
+    if (result && result.roster) {
+      return { 
+        success: true, 
+        updatedRoster: result.roster 
+      };
+    } else {
+      return { success: false, reason: 'LINEUP_UPDATE_FAILED', result };
+    }
+  } catch (error: any) {
+    console.error('Lineup change execution error:', error);
+    return { 
+      success: false, 
+      reason: 'LINEUP_EXECUTION_ERROR', 
+      error: error.message 
+    };
+  }
+}

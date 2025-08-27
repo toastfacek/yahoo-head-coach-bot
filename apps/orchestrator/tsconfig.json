@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "declaration": false,
     "declarationMap": false,
-    "sourceMap": true,
+    "sourceMap": false,
     "removeComments": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -24,7 +24,9 @@
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": [
     "src/**/*"
@@ -32,6 +34,8 @@
   "exclude": [
     "node_modules",
     "dist",
-    "src/**/__tests__/**"
+    "src/**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }
