@@ -3,9 +3,7 @@ builder = "nixpacks"
 buildCommand = "npm install"
 
 [deploy]
-startCommand = "npm run start:discord"
-healthcheckPath = "/health"
-healthcheckTimeout = 300
+startCommand = "npx ts-node apps/discord-bot/src/bot.ts"
 restartPolicyType = "always"
 
 [env]
