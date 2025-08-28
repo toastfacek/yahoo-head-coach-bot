@@ -50,12 +50,12 @@ export class OrchestratorApiService {
   }
 
   async getOAuthUrl(userId: string): Promise<string> {
+    // Directly construct the orchestrator OAuth start URL for Discord users to click
     try {
-      const response = await this.api.get(`/oauth/start?userId=${userId}`);
-      // The orchestrator should return redirect URL or auth URL
-      return response.request.res.responseUrl || response.data.authUrl;
+      const url = `${env.ORCHESTRATOR_URL}/api/oauth/start?userId=${encodeURIComponent(userId)}`;
+      return url;
     } catch (error) {
-      apiLogger.error({ error, userId }, 'Failed to get OAuth URL');
+      apiLogger.error({ error, userId }, 'Failed to construct OAuth URL');
       throw new Error('Failed to generate authentication URL');
     }
   }

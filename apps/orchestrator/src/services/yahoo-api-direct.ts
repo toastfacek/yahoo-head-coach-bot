@@ -290,10 +290,29 @@ export async function yfForUser(userId: string) {
       },
     },
     team: {
-      roster: async (teamKey: string) => {
-        const result = await client.getTeamRoster(teamKey);
-        if (!result.success) throw new Error(result.error);
-        return { roster: result.data?.team?.roster?.players || [] };
+      // If called with a string, fetch roster; otherwise return editor API
+      roster: (maybeTeamKey?: string) => {
+        if (typeof maybeTeamKey === 'string') {
+          return (async () => {
+            const result = await client.getTeamRoster(maybeTeamKey);
+            if (!result.success) throw new Error(result.error);
+            return { roster: result.data?.team?.roster?.players || [] };
+          })();
+        }
+        return {
+          edit: async (data: {
+            teamKey: string;
+            roster_moves: Array<{ player_key: string; position: string }>;
+          }) => {
+            const moves = (data.roster_moves || []).map((m) => ({
+              playerId: m.player_key,
+              newPosition: m.position,
+            }));
+            const result = await client.updateRosterPositions(data.teamKey, moves);
+            if (!result.success) throw new Error(result.error);
+            return { roster: result.data?.roster || true };
+          },
+        };
       },
       transactions: () => ({
         add: async (data: any) => {
@@ -462,7 +481,7 @@ export async function callYahoo(action: any) {
           transactionRequest.faab_bid = actionData.fabBid;
         }
 
-        const result = await yf.team.transactions().add(transactionRequest);
+        const result = await yf.team.transactions().add({ ...transactionRequest, teamKey });
 
         if (!result || !result.transaction || !result.transaction.transaction_id) {
           return { success: false, reason: 'TRANSACTION_FAILED' };
@@ -487,6 +506,7 @@ export async function callYahoo(action: any) {
         }));
 
         const rosterResult = await yf.team.roster().edit({
+          teamKey,
           roster_moves: rosterMoves,
         });
 
@@ -529,4 +549,36 @@ export async function callYahoo(action: any) {
       error: error.message,
     };
   }
+}
+
+// Utility to list user leagues for a given game code
+export async function listUserLeagues(
+  userId: string,
+  gameCode: string = 'nfl'
+): Promise<Array<{ id: string; name: string; season: number; sport: string }>> {
+  const client = await createYahooClient(userId);
+  const gameMeta = await client.getGameMeta(gameCode);
+  if (!gameMeta.success) throw new Error(gameMeta.error || 'Failed to get game meta');
+
+  const gameKey = String(gameMeta.data?.fantasy_content?.game?.[0]?.game_key || '');
+  if (!gameKey) throw new Error('No game key');
+
+  const leagues = await client.getUserGameLeagues(gameKey);
+  if (!leagues.success) throw new Error(leagues.error || 'Failed to get user leagues');
+
+  const raw = leagues.data?.fantasy_content?.users?.[0]?.user?.[1]?.games?.[0]?.game?.[1]?.leagues;
+  const items: any[] = [];
+  if (raw && typeof raw === 'object') {
+    for (const k in raw) {
+      const entry = raw[k];
+      if (entry?.league) items.push(entry.league);
+    }
+  }
+
+  return items.map((lg: any) => ({
+    id: String(lg?.league_key?.split('.l.')[1] || lg?.league_id || ''),
+    name: String(lg?.name || 'League'),
+    season: Number(lg?.season || new Date().getFullYear()),
+    sport: String(lg?.game_code || gameCode),
+  }));
 }

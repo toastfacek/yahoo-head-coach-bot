@@ -10,10 +10,21 @@ export async function listPending(req: Request, res: Response) {
   if (!parsed.success)
     return res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
   const { leagueId } = parsed.data;
-  const pending = await prisma.recommendation.findMany({
+  const recs = await prisma.recommendation.findMany({
     where: { leagueId, status: 'STAGED' },
     orderBy: { createdAt: 'desc' },
   });
+  // Normalize for Discord bot expectations
+  const pending = recs.map((r) => ({
+    id: r.id,
+    type: r.type === 'WAIVER' ? 'WAIVER_CLAIM' : r.type,
+    summary: r.summary,
+    confidence: r.confidence,
+    reason: (r as any).reason || undefined,
+    notes: undefined,
+    data: (r as any).payload,
+    created_at: r.createdAt,
+  }));
   res.json({ pending });
 }
 
@@ -62,7 +73,7 @@ export async function approve(req: Request, res: Response) {
           executionResult: execRes,
         },
       });
-      res.json({ ok: true, result: execRes });
+      res.json({ success: true, result: execRes });
     } else {
       // Update with execution failure details
       await prisma.recommendation.update({
@@ -71,18 +82,11 @@ export async function approve(req: Request, res: Response) {
           executionResult: execRes,
         },
       });
-      res.status(500).json({
-        error: 'Yahoo API execution failed',
-        reason: execRes?.reason,
-        details: execRes,
-      });
+      res.status(500).json({ success: false, reason: execRes?.reason, details: execRes });
     }
   } catch (error: any) {
     console.error('Approval execution error:', error);
-    res.status(500).json({
-      error: 'Execution error',
-      message: error.message,
-    });
+    res.status(500).json({ success: false, error: 'Execution error', message: error.message });
   }
 }
 
@@ -94,5 +98,5 @@ export async function reject(req: Request, res: Response) {
     return res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });
   const { id } = parsed.data;
   await prisma.recommendation.update({ where: { id }, data: { status: 'REJECTED' } });
-  res.json({ ok: true });
+  res.json({ success: true });
 }

@@ -9,4 +9,5 @@ export {
   stageActions,
   callYahoo,
   createYahooClient,
+  listUserLeagues,
 } from './yahoo-api-direct';

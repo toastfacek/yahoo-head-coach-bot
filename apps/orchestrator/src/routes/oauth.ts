@@ -162,7 +162,31 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
       },
     });
 
-    console.log(`OAuth tokens stored successfully for user: ${userId}`);
+    // Link Discord user mapping and set as authenticated if present/needed
+    try {
+      // Upsert DiscordUser by discordId=userId
+      const discordId = userId;
+      const existing = await prisma.discordUser.findUnique({ where: { discordId } });
+      if (existing) {
+        await prisma.discordUser.update({
+          where: { discordId },
+          data: { userId: user.id, isAuthenticated: true },
+        });
+      } else {
+        await prisma.discordUser.create({
+          data: {
+            discordId,
+            discordUsername: discordId,
+            userId: user.id,
+            isAuthenticated: true,
+          },
+        });
+      }
+    } catch (linkErr) {
+      console.warn('Failed to link Discord user during OAuth callback:', linkErr);
+    }
+
+    console.log(`OAuth tokens stored and user linked successfully for user: ${userId}`);
 
     // Success response - HTML format to match working simple-server implementation
     res.send(`
@@ -199,17 +223,19 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
     const userId = String(parsed.data.userId || 'dev');
     const tok = await prisma.yahooToken.findUnique({ where: { userId } });
     if (!tok) {
-      res.json({ userId, hasToken: false });
+      res.json({ authenticated: false, userId });
       return;
     }
     const msLeft = tok.expiresAt.getTime() - Date.now();
     res.json({
-      userId,
-      hasToken: true,
-      expiresAt: tok.expiresAt.toISOString(),
-      expiresInSeconds: Math.max(Math.floor(msLeft / 1000), 0),
-      scope: tok.scope,
-      tokenType: tok.tokenType,
+      authenticated: true,
+      userInfo: {
+        id: userId,
+        scope: tok.scope,
+        tokenType: tok.tokenType,
+        expiresAt: tok.expiresAt.toISOString(),
+        expiresInSeconds: Math.max(Math.floor(msLeft / 1000), 0),
+      },
     });
   } catch (error) {
     console.error('tokenStatus error:', error);

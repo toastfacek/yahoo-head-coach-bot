@@ -3,6 +3,8 @@ import { Router } from 'express';
 import { listPending, approve, reject } from './approvals';
 import { handleChat } from './chat';
 import { healthCheck } from './health';
+import { getUserLeagues } from './leagues';
+import { getUserLeagues } from './leagues';
 import { checkLineup } from './lineup';
 import { oauthStart, oauthCallback, tokenStatus, refreshNow } from './oauth';
 import { dailyReport } from './reports';
@@ -23,6 +25,9 @@ router.get('/oauth/refresh', refreshNow);
 
 // Reports endpoints
 router.get('/reports/daily', dailyReport);
+
+// Leagues endpoint
+router.get('/leagues', getUserLeagues);
 
 // Action endpoints
 router.post('/lineup/check', checkLineup);

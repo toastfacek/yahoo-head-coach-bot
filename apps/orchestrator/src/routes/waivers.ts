@@ -16,7 +16,13 @@ export async function runWaivers(req: Request, res: Response) {
   try {
     const stream = await runHeadCoach({ leagueId, userId, intent: 'WEEKLY_WAIVERS' });
     const text = await (stream as any).text();
-    res.json({ text });
+    // Normalize to FantasyReportData shape expected by Discord bot
+    res.json({
+      summary: text ? [text] : [],
+      lineup: [],
+      waivers: [],
+      notes: [],
+    });
   } catch (error: any) {
     console.error('runWaivers error:', error);
     res.status(500).json({ error: 'Agent error', message: error?.message || 'Unknown error' });
