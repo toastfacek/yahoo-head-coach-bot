@@ -20,6 +20,7 @@ jobs:
       - name: Type check (orchestrator, no emit)
         run: npx tsc -p apps/orchestrator/tsconfig.json --noEmit
         env:
+          NODE_OPTIONS: --max-old-space-size=4096
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
           YAHOO_CLIENT_ID: dummy
           YAHOO_CLIENT_SECRET: dummy
