@@ -69,30 +69,33 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
   });
 });
 
-// Initialize database and start server
+// Start server immediately, connect to database in background
 async function startServer() {
-  try {
-    console.log('🔄 Connecting to database...');
-    await connectDatabase();
-    
-    // Test database health
-    const health = await getDatabaseHealth();
-    if (health.healthy) {
-      console.log(`✅ Database connection healthy (${health.latency}ms latency)`);
-    } else {
-      console.warn(`⚠️  Database connection unhealthy: ${health.error}`);
-    }
-  } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    console.log('📝 Server will continue with limited functionality');
-  }
-
-  // Start HTTP server
+  // Start HTTP server first (non-blocking)
   const server = app.listen(PORT, () => {
     console.log(`🚀 HeadCoach Orchestrator server running on port ${PORT}`);
     console.log(`📊 Health check available at: http://localhost:${PORT}/api/health`);
     console.log(`📈 Environment: ${env.NODE_ENV} | Model: ${env.AI_MODEL} | Mode: ${env.EXECUTION_MODE}`);
   });
+
+  // Connect to database in background (non-blocking)
+  setTimeout(async () => {
+    try {
+      console.log('🔄 Connecting to database in background...');
+      await connectDatabase();
+      
+      // Test database health
+      const health = await getDatabaseHealth();
+      if (health.healthy) {
+        console.log(`✅ Database connection healthy (${health.latency}ms latency)`);
+      } else {
+        console.warn(`⚠️  Database connection unhealthy: ${health.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Database connection failed:', error);
+      console.log('📝 Server continues with limited functionality (database routes will fail)');
+    }
+  }, 1000); // Wait 1 second after server starts
 
   return server;
 }

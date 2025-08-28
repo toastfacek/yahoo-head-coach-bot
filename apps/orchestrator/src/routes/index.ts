@@ -14,6 +14,15 @@ import { getTeamRoster } from './roster';
 
 const router = Router();
 
+// Root endpoint for basic connectivity check
+router.get('/', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    service: 'orchestrator',
+    message: 'Yahoo Fantasy HeadCoach API is running'
+  });
+});
+
 // Health check endpoint
 router.get('/health', healthCheck);
 
