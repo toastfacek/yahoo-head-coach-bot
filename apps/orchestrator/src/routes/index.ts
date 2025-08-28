@@ -23,8 +23,9 @@ router.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint
+// Health check endpoints (both paths for flexibility)
 router.get('/health', healthCheck);
+router.get('/api/health', healthCheck);
 
 // OAuth endpoints
 router.get('/oauth/start', oauthStart);
