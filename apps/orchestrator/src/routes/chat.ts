@@ -177,27 +177,3 @@ function buildChatUserInstruction({ message, leagueId, userId, currentPage, inte
   ].join('\n');
 }
 
-/**
- * Get chat history for context (future enhancement)
- */
-export async function getChatHistory(req: Request, res: Response) {
-  const { conversationId, limit = 20 } = req.query;
-  
-  try {
-    // Future: Implement chat history retrieval from database
-    // For now, return empty history
-    res.json({
-      success: true,
-      messages: [],
-      conversationId,
-      limit
-    });
-  } catch (error: any) {
-    console.error('Get chat history error:', error);
-    res.status(500).json({
-      error: 'Failed to retrieve chat history',
-      message: error?.message || 'Unknown error',
-      success: false
-    });
-  }
-}

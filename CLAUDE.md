@@ -10,7 +10,7 @@ Yahoo Fantasy "HeadCoach" is an AI-powered fantasy football management assistant
 
 **Monorepo Structure:**
 - `apps/orchestrator/` - Node.js/Express backend with TypeScript
-- `apps/ui/` - Streamlit frontend in Python  
+- `apps/discord-bot/` - Discord bot client with TypeScript
 - `packages/data/` - Shared Prisma database schema and client
 
 **Core AI Agent Pattern (Vercel AI SDK):**
@@ -43,9 +43,10 @@ npx prisma generate                    # Regenerate Prisma client
 npx prisma studio                      # Open database GUI
 ```
 
-**Frontend (UI):**
+**Discord Bot:**
 ```bash
-streamlit run app.py    # Start Streamlit UI server
+npm run dev:discord     # Start Discord bot in development
+npm run deploy-commands # Deploy Discord slash commands
 ```
 
 **Root workspace:**
