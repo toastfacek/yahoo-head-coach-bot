@@ -1,8 +1,8 @@
 // AI-Powered Analyst Sub-Agent with sophisticated reasoning
 // Uses Claude 3.5 Haiku for cost-efficient complex analysis
-import { Anthropic } from '@anthropic-ai/sdk';
+import { anthropic } from '@ai-sdk/anthropic';
+import { generateObject } from 'ai';
 import { z } from 'zod';
-import { env } from '../config/env';
 
 // Structured schemas for analyst outputs
 export const WaiverRecommendationSchema = z.object({
@@ -54,13 +54,10 @@ export type AnalysisResponse = z.infer<typeof AnalysisResponseSchema>;
  * - Confidence-based recommendations with detailed reasoning
  */
 export class AnalystAgent {
-  private client: Anthropic;
-  private model = 'claude-3-5-haiku-20241022'; // Cost-optimized for analysis
+  private model = anthropic('claude-3-5-haiku-20241022'); // Cost-optimized for analysis
 
-  constructor(apiKey?: string) {
-    this.client = new Anthropic({ 
-      apiKey: apiKey || env.ANTHROPIC_API_KEY 
-    });
+  constructor() {
+    // Using centralized AI configuration from Vercel AI SDK
   }
 
   /**
@@ -145,15 +142,17 @@ For each recommended player, provide:
 Focus on 3-7 top targets with actionable recommendations. Be specific with bid amounts and reasoning.`;
 
     try {
-      const response = await this.client.messages.create({
+      const result = await generateObject({
         model: this.model,
-        max_tokens: 2500,
         system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }]
+        prompt: prompt,
+        schema: z.object({
+          recommendations: z.array(WaiverRecommendationSchema)
+        }),
+        maxTokens: 2500
       });
 
-      const analysisText = response.content[0].text;
-      return this.parseWaiverRecommendations(analysisText, input);
+      return result.object.recommendations;
     } catch (error) {
       console.error('AnalystAgent waiver analysis error:', error);
       return this.createErrorWaiverResponse(error, input);
@@ -243,15 +242,17 @@ ANALYSIS REQUIREMENTS:
 Week ${input.week || 'Current'} - Focus on actionable decisions with confidence levels.`;
 
     try {
-      const response = await this.client.messages.create({
+      const result = await generateObject({
         model: this.model,
-        max_tokens: 2000,
         system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }]
+        prompt: prompt,
+        schema: z.object({
+          lineup_changes: z.array(LineupRecommendationSchema)
+        }),
+        maxTokens: 2000
       });
 
-      const analysisText = response.content[0].text;
-      return this.parseLineupOptimization(analysisText, input);
+      return result.object.lineup_changes;
     } catch (error) {
       console.error('AnalystAgent lineup optimization error:', error);
       return this.createErrorLineupResponse(error, input);
