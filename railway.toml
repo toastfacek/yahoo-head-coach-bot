@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm install"
+
+[deploy]
+startCommand = "npm run start:discord"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "always"
+
+[env]
+NODE_ENV = "production"

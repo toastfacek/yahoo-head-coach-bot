@@ -3,9 +3,14 @@
   "private": true,
   "scripts": {
     "dev": "npm run dev --workspace=apps/orchestrator",
-    "build": "npm run build --workspace=apps/orchestrator",
+    "dev:discord": "npm run dev --workspace=apps/discord-bot",
+    "build": "npm run build --workspace=apps/orchestrator && npm run build --workspace=apps/discord-bot",
+    "build:orchestrator": "npm run build --workspace=apps/orchestrator",
+    "build:discord": "npm run build --workspace=apps/discord-bot",
+    "start:discord": "npm run build --workspace=apps/discord-bot && npm run start --workspace=apps/discord-bot",
     "test": "npm run test --workspace=apps/orchestrator",
-    "check:setup": "npm run check:setup --workspace=apps/orchestrator"
+    "check:setup": "npm run check:setup --workspace=apps/orchestrator",
+    "deploy-commands": "npm run deploy-commands --workspace=apps/discord-bot"
   },
   "devDependencies": {
     "dotenv": "^17.2.1",
