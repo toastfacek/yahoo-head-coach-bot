@@ -9,19 +9,24 @@ export const mockYahooClient = {
     meta: vi.fn()
   },
   getLeagueTeams: vi.fn(),
-  getUserGameTeams: vi.fn(),
   user: {
     game_teams: vi.fn()
   },
   team: {
-    roster: vi.fn(),
+    roster: vi.fn().mockReturnValue({
+      edit: vi.fn().mockResolvedValue({ roster: 'updated_roster' })
+    }),
     transactions: vi.fn().mockReturnValue({
-      add: vi.fn()
+      add: vi.fn().mockResolvedValue({ transaction: { transaction_id: 'trans_123' } })
     })
   },
   setUserToken: vi.fn(),
   setRefreshToken: vi.fn(),
-  getGameMeta: vi.fn()
+  getGameMeta: vi.fn().mockResolvedValue({ success: true, game_key: '431' }),
+  getLeagueMeta: vi.fn().mockResolvedValue({ success: true, data: { league: { draft_status: 'postdraft' } } }),
+  getUserGameTeams: vi.fn().mockResolvedValue({ success: true, data: { users: [{ user: { games: [{ teams: [{ team_key: '431.l.123456.t.1', managers: [{ guid: 'test-user-1' }] }] }] } }] } }),
+  getTeamRoster: vi.fn().mockResolvedValue({ success: true, data: { team: { roster: { players: [] } } } }),
+  addDropPlayers: vi.fn().mockResolvedValue({ success: true })
 };
 
 // Mock Yahoo Fantasy module
