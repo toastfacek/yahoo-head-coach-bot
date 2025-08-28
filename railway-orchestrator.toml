@@ -3,7 +3,7 @@ builder = "nixpacks"
 buildCommand = "npm install"
 
 [deploy]
-startCommand = "npx ts-node ./apps/orchestrator/src/server.ts"
+startCommand = "npx ts-node /app/apps/orchestrator/src/server.ts"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "always"

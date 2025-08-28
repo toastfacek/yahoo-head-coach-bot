@@ -3,7 +3,7 @@ builder = "nixpacks"
 buildCommand = "npm install"
 
 [deploy]
-startCommand = "npx ts-node ./apps/discord-bot/src/bot.ts"
+startCommand = "npx ts-node /app/apps/discord-bot/src/bot.ts"
 restartPolicyType = "always"
 
 [env]
