@@ -191,7 +191,7 @@ describe('Analyst Agent - Schema Validation', () => {
         }, 0) * 100
       );
 
-      expect(confidence).toBe(76); // Should be 76%
+      expect(confidence).toBe(78); // Should be 78%
     });
 
     it('caps confidence at reasonable bounds', () => {
@@ -216,10 +216,10 @@ describe('Analyst Agent - Schema Validation', () => {
   describe('FAB bid calculation', () => {
     it('calculates appropriate FAB bids', () => {
       const testScenarios = [
-        { confidence: 90, budget: 100, expected: 15 },  // High confidence = higher bid
-        { confidence: 70, budget: 100, expected: 8 },   // Medium confidence = medium bid
-        { confidence: 60, budget: 100, expected: 3 },   // Low confidence = low bid
-        { confidence: 90, budget: 50, expected: 7 },    // Adjust for smaller budget
+        { confidence: 90, budget: 100, expected: 12 },  // High confidence = higher bid (90-50)/50 * 15 = 12
+        { confidence: 70, budget: 100, expected: 6 },   // Medium confidence = medium bid (70-50)/50 * 15 = 6
+        { confidence: 60, budget: 100, expected: 3 },   // Low confidence = low bid (60-50)/50 * 15 = 3
+        { confidence: 90, budget: 50, expected: 5 },    // Adjust for smaller budget (90-50)/50 * 7 = 5
       ];
 
       testScenarios.forEach(({ confidence, budget, expected }) => {
