@@ -19,4 +19,4 @@ EXPOSE 3000
 
 # Start the Discord bot directly with ts-node (skip build step)
 WORKDIR /app
-CMD ["npx", "ts-node", "/app/apps/discord-bot/src/bot.ts"]
+CMD ["sh", "-c", "cd /app && npx ts-node apps/discord-bot/src/bot.ts"]
