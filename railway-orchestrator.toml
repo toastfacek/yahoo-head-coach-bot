@@ -1,13 +1,14 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install"
+buildCommand = "npm install && npm run build:orchestrator && npx prisma generate --schema=packages/data/prisma/schema.prisma"
 
 [deploy]
-startCommand = "sh -c 'cd /app && npx ts-node apps/orchestrator/src/server.ts'"
-healthcheckPath = "/"
+startCommand = "node apps/orchestrator/dist/server.js"
+healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "always"
 
 [env]
 NODE_ENV = "production"
 PORT = "3000"
+SERVICE = "orchestrator"

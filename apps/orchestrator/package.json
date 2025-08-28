@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Orchestrator server for Yahoo Fantasy Football HeadCoach agent",
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",

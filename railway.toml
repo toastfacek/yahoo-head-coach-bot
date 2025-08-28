@@ -1,10 +1,11 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install"
+buildCommand = "npm install && npm run build:discord && npx prisma generate --schema=packages/data/prisma/schema.prisma"
 
 [deploy]
-startCommand = "sh -c 'cd /app && npx ts-node apps/discord-bot/src/bot.ts'"
+startCommand = "node apps/discord-bot/dist/bot.js"
 restartPolicyType = "always"
 
 [env]
 NODE_ENV = "production"
+SERVICE = "discord"
