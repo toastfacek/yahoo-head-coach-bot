@@ -52,7 +52,7 @@ router.get('/team/roster', getTeamRoster);
 
 // Root endpoint
 router.get('/', (req, res) => {
-  res.json({
+  res.status(200).json({
     message: 'Yahoo Fantasy Football HeadCoach API',
     version: process.env.npm_package_version || '1.0.0',
     endpoints: {

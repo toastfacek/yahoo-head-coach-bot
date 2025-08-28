@@ -50,12 +50,16 @@ async function initializeBot() {
     // Register event handlers
     registerEventHandlers();
 
-    // Login to Discord
+    // Login to Discord (if token present)
+    if (!env.DISCORD_TOKEN) {
+      discordLogger.warn('DISCORD_TOKEN is not set. Skipping Discord login; health endpoint will remain up.');
+      return;
+    }
     await client.login(env.DISCORD_TOKEN);
     
   } catch (error) {
-    discordLogger.error(error, 'Failed to initialize bot');
-    process.exit(1);
+    // Do not exit the process so health endpoint stays up
+    discordLogger.error(error, 'Failed to initialize bot; keeping process alive for healthchecks');
   }
 }
 
