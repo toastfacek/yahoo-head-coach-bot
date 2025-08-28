@@ -1,5 +1,5 @@
 // Test setup and configuration
-import { beforeEach, vi } from 'vitest';
+import { beforeAll, afterAll, beforeEach, vi } from 'vitest';
 
 // Mock environment variables for testing - must be set before any modules load
 Object.assign(process.env, {
@@ -10,6 +10,34 @@ Object.assign(process.env, {
   ANTHROPIC_API_KEY: 'test_anthropic_key',
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   EXECUTION_MODE: 'dry-run'
+});
+
+// Import Prisma mock to ensure it's set up before any database imports
+import './mocks/prisma.mock';
+
+// Import mocked database functions (will be mocked by prisma.mock.ts)
+import { connectDatabase, disconnectDatabase } from '../db';
+
+// Database setup and teardown
+beforeAll(async () => {
+  // Mock database connection for all tests
+  try {
+    await connectDatabase();
+    console.log('🧪 Test database connection established');
+  } catch (error) {
+    console.error('❌ Test database setup failed:', error);
+  }
+});
+
+afterAll(async () => {
+  // Clean up test resources
+  try {
+    await disconnectDatabase();
+    console.log('🧪 Test database connection closed');
+  } catch (error) {
+    console.error('❌ Test cleanup failed:', error);
+  }
+  vi.clearAllMocks();
 });
 
 // Reset mocks before each test

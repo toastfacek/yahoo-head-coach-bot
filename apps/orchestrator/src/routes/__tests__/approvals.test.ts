@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { listPending, approve, reject } from '../approvals';
@@ -39,6 +39,14 @@ vi.mock('../../services/yahoo', () => ({
 
 describe('Approvals API Routes', () => {
   let app: express.Application;
+
+  beforeAll(async () => {
+    // Database connection established in global setup
+  });
+
+  afterAll(async () => {
+    // Database cleanup handled in global teardown
+  });
 
   beforeEach(() => {
     app = createTestApp();

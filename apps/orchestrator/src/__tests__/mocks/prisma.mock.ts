@@ -29,9 +29,13 @@ export const mockPrismaClient = {
   $disconnect: vi.fn()
 };
 
-// Mock Prisma module
+// Mock database connection manager
 vi.mock('../../db', () => ({
-  prisma: mockPrismaClient
+  prisma: mockPrismaClient,
+  connectDatabase: vi.fn().mockResolvedValue(mockPrismaClient),
+  disconnectDatabase: vi.fn().mockResolvedValue(undefined),
+  getDatabaseHealth: vi.fn().mockResolvedValue({ healthy: true, latency: 50 }),
+  directPrisma: vi.fn().mockReturnValue(mockPrismaClient)
 }));
 
 // Sample database records

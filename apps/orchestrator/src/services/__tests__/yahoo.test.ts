@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { 
   yfForUser, 
   getGameKey, 
@@ -24,11 +24,20 @@ import {
 } from '../../__tests__/mocks/prisma.mock';
 
 describe('Yahoo Service Integration', () => {
+  beforeAll(async () => {
+    // Database connection established in global setup
+  });
+
+  afterAll(async () => {
+    // Database cleanup handled in global teardown
+  });
+
   beforeEach(() => {
     resetYahooMocks();
     resetPrismaMocks();
     setupYahooMocks();
     setupPrismaMocks();
+    vi.clearAllMocks();
   });
 
   describe('yfForUser', () => {

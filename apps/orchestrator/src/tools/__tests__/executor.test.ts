@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { 
   mockPrismaClient, 
   setupPrismaMocks, 
@@ -39,6 +39,14 @@ vi.mock('../../guards/shouldExecute', () => ({
 }));
 
 describe('Executor Tool', () => {
+  beforeAll(async () => {
+    // Database connection established in global setup
+  });
+
+  afterAll(async () => {
+    // Database cleanup handled in global teardown
+  });
+
   beforeEach(() => {
     resetPrismaMocks();
     resetYahooMocks();
