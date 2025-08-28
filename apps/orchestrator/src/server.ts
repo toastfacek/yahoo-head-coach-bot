@@ -1,6 +1,5 @@
-// Load environment variables first, before any other imports
-import dotenv from 'dotenv';
-dotenv.config({ path: '../../.env' });
+// Load environment variables first
+import 'dotenv/config';
 
 import express from 'express';
 import cors from 'cors';
@@ -12,7 +11,8 @@ import { env, allowedOrigins } from './config/env';
 import { connectDatabase, getDatabaseHealth, disconnectDatabase } from './db';
 
 const app = express();
-const PORT = Number(env.PORT || 3000);
+// Prefer platform-provided PORT (e.g., Railway), then env schema, then 3000
+const PORT = Number(process.env.PORT || env.PORT || 3000);
 
 // Security middleware
 app.use(helmet());
