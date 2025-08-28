@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { listPending, approve, reject } from '../approvals';
+import { prisma } from '../../db';
+import * as yahooService from '../../services/yahoo';
 
 // Create a test app
 function createTestApp() {
@@ -15,7 +17,7 @@ function createTestApp() {
   return app;
 }
 
-// Mock the database
+// Mock the database  
 vi.mock('../../db', () => ({
   prisma: {
     recommendation: {
@@ -37,13 +39,9 @@ vi.mock('../../services/yahoo', () => ({
 
 describe('Approvals API Routes', () => {
   let app: express.Application;
-  let mockPrisma: any;
-  let mockYahooService: any;
 
   beforeEach(() => {
     app = createTestApp();
-    mockPrisma = require('../../db').prisma;
-    mockYahooService = require('../../services/yahoo');
     vi.clearAllMocks();
   });
 
@@ -70,7 +68,7 @@ describe('Approvals API Routes', () => {
         }
       ];
 
-      mockPrisma.recommendation.findMany.mockResolvedValue(mockRecommendations);
+      vi.mocked(prisma.recommendation.findMany).mockResolvedValue(mockRecommendations);
 
       const response = await request(app)
         .get('/approvals/pending')
@@ -80,7 +78,7 @@ describe('Approvals API Routes', () => {
       expect(response.body.pending).toHaveLength(2);
       expect(response.body.pending[0].id).toBe('rec_1');
       
-      expect(mockPrisma.recommendation.findMany).toHaveBeenCalledWith({
+      expect(vi.mocked(prisma.recommendation.findMany)).toHaveBeenCalledWith({
         where: { leagueId: '123456', status: 'STAGED' },
         orderBy: { createdAt: 'desc' }
       });
@@ -104,7 +102,7 @@ describe('Approvals API Routes', () => {
     });
 
     it('returns empty array when no pending recommendations', async () => {
-      mockPrisma.recommendation.findMany.mockResolvedValue([]);
+      vi.mocked(prisma.recommendation.findMany).mockResolvedValue([]);
 
       const response = await request(app)
         .get('/approvals/pending')
@@ -130,8 +128,8 @@ describe('Approvals API Routes', () => {
     };
 
     it('successfully executes approved recommendation', async () => {
-      mockPrisma.recommendation.findUnique.mockResolvedValue(mockRecommendation);
-      mockYahooService.callYahoo.mockResolvedValue({ 
+      vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(mockRecommendation);
+      vi.mocked(yahooService.callYahoo).mockResolvedValue({ 
         success: true, 
         transactionId: 'trans_123' 
       });
@@ -144,7 +142,7 @@ describe('Approvals API Routes', () => {
       expect(response.body.ok).toBe(true);
       expect(response.body.result.success).toBe(true);
 
-      expect(mockPrisma.recommendation.update).toHaveBeenCalledWith({
+      expect(vi.mocked(prisma.recommendation.update)).toHaveBeenCalledWith({
         where: { id: 'rec_123' },
         data: {
           status: 'EXECUTED',
@@ -164,7 +162,7 @@ describe('Approvals API Routes', () => {
     });
 
     it('returns 404 for non-existent recommendation', async () => {
-      mockPrisma.recommendation.findUnique.mockResolvedValue(null);
+      vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(null);
 
       const response = await request(app)
         .post('/approvals/approve')
@@ -179,7 +177,7 @@ describe('Approvals API Routes', () => {
         ...mockRecommendation,
         status: 'EXECUTED'
       };
-      mockPrisma.recommendation.findUnique.mockResolvedValue(executedRecommendation);
+      vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(executedRecommendation);
 
       const response = await request(app)
         .post('/approvals/approve')
@@ -190,8 +188,8 @@ describe('Approvals API Routes', () => {
     });
 
     it('handles Yahoo API execution failure', async () => {
-      mockPrisma.recommendation.findUnique.mockResolvedValue(mockRecommendation);
-      mockYahooService.callYahoo.mockResolvedValue({ 
+      vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(mockRecommendation);
+      vi.mocked(yahooService.callYahoo).mockResolvedValue({ 
         success: false, 
         reason: 'TRANSACTION_FAILED' 
       });
@@ -205,7 +203,7 @@ describe('Approvals API Routes', () => {
       expect(response.body.reason).toBe('TRANSACTION_FAILED');
 
       // Should still update the recommendation with execution result
-      expect(mockPrisma.recommendation.update).toHaveBeenCalledWith({
+      expect(vi.mocked(prisma.recommendation.update)).toHaveBeenCalledWith({
         where: { id: 'rec_123' },
         data: {
           executionResult: { success: false, reason: 'TRANSACTION_FAILED' }
@@ -214,8 +212,8 @@ describe('Approvals API Routes', () => {
     });
 
     it('handles missing team key error', async () => {
-      mockPrisma.recommendation.findUnique.mockResolvedValue(mockRecommendation);
-      mockYahooService.userTeamKey.mockResolvedValue(null);
+      vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(mockRecommendation);
+      vi.mocked(yahooService.userTeamKey).mockResolvedValue(null);
 
       const response = await request(app)
         .post('/approvals/approve')
@@ -226,15 +224,15 @@ describe('Approvals API Routes', () => {
     });
 
     it('uses default userId when not provided', async () => {
-      mockPrisma.recommendation.findUnique.mockResolvedValue(mockRecommendation);
-      mockYahooService.callYahoo.mockResolvedValue({ success: true });
+      vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(mockRecommendation);
+      vi.mocked(yahooService.callYahoo).mockResolvedValue({ success: true });
 
       const response = await request(app)
         .post('/approvals/approve')
         .send({ id: 'rec_123' }); // No userId provided
 
       expect(response.status).toBe(200);
-      expect(mockYahooService.yfForUser).toHaveBeenCalledWith('dev');
+      expect(vi.mocked(yahooService.yfForUser)).toHaveBeenCalledWith('dev');
     });
   });
 
@@ -247,7 +245,7 @@ describe('Approvals API Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.ok).toBe(true);
 
-      expect(mockPrisma.recommendation.update).toHaveBeenCalledWith({
+      expect(vi.mocked(prisma.recommendation.update)).toHaveBeenCalledWith({
         where: { id: 'rec_123' },
         data: { status: 'REJECTED' }
       });
@@ -274,7 +272,7 @@ describe('Approvals API Routes', () => {
 
   describe('error handling', () => {
     it('handles database connection errors', async () => {
-      mockPrisma.recommendation.findMany.mockRejectedValue(new Error('Database error'));
+      vi.mocked(prisma.recommendation.findMany).mockRejectedValue(new Error('Database error'));
 
       const response = await request(app)
         .get('/approvals/pending')
@@ -291,8 +289,8 @@ describe('Approvals API Routes', () => {
         payload: { type: 'WAIVER' }
       };
       
-      mockPrisma.recommendation.findUnique.mockResolvedValue(mockRecommendation);
-      mockYahooService.yfForUser.mockRejectedValue(new Error('Yahoo service error'));
+      vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(mockRecommendation);
+      vi.mocked(yahooService.yfForUser).mockRejectedValue(new Error('Yahoo service error'));
 
       const response = await request(app)
         .post('/approvals/approve')

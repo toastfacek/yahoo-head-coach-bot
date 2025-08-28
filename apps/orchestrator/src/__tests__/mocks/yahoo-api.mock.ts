@@ -8,6 +8,8 @@ export const mockYahooClient = {
   league: {
     meta: vi.fn()
   },
+  getLeagueTeams: vi.fn(),
+  getUserGameTeams: vi.fn(),
   user: {
     game_teams: vi.fn()
   },
@@ -18,7 +20,8 @@ export const mockYahooClient = {
     })
   },
   setUserToken: vi.fn(),
-  setRefreshToken: vi.fn()
+  setRefreshToken: vi.fn(),
+  getGameMeta: vi.fn()
 };
 
 // Mock Yahoo Fantasy module
@@ -109,7 +112,10 @@ export const mockTransactionResponse = {
 // Helper to setup common mock responses
 export function setupYahooMocks() {
   mockYahooClient.game.meta.mockResolvedValue(mockGameData);
+  mockYahooClient.getGameMeta.mockResolvedValue(mockGameData);
   mockYahooClient.league.meta.mockResolvedValue(mockLeagueData);
+  mockYahooClient.getLeagueTeams.mockResolvedValue({ teams: [{ team_key: '431.l.123456.t.1', managers: [{ guid: 'test-user-1' }] }] });
+  mockYahooClient.getUserGameTeams.mockResolvedValue(mockUserTeams);
   mockYahooClient.user.game_teams.mockResolvedValue(mockUserTeams);
   mockYahooClient.team.roster.mockResolvedValue(mockRosterData);
   mockYahooClient.team.transactions().add.mockResolvedValue(mockTransactionResponse);
