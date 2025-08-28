@@ -1,42 +1,37 @@
 # Repository Guidelines
 
-## Project Structure & Modules
-- apps/orchestrator: TypeScript Express API (HeadCoach orchestrator). Entry: `src/server.ts`; routes in `src/routes`, agents/tools in `src/agents` and `src/tools`, config in `src/config`.
-- apps/ui: Lightweight Streamlit UI (`apps/ui/app.py`) that calls orchestrator endpoints via SSE/HTTP.
-- packages/data: Prisma schema and database client.
-- Root: npm workspaces (`apps/*`, `packages/*`). See `pnpm-workspace.yaml` and root `package.json`.
+## Project Structure & Module Organization
+- apps/orchestrator: TypeScript Express API (HeadCoach). Entry: `src/server.ts`. Routes in `src/routes`, agents/tools in `src/agents` and `src/tools`, config in `src/config`.
+- apps/ui: Streamlit app (`apps/ui/app.py`) calling orchestrator via SSE/HTTP.
+- packages/data: Prisma schema and generated client.
+- Root: npm workspaces (`apps/*`, `packages/*`) via `pnpm-workspace.yaml` and root `package.json`.
 
-## Build, Test, and Development
-- Install deps (workspaces): `npm install`
-- Orchestrator dev: `npm run -w @yahoo-fantasy-bot/orchestrator dev` (TS + nodemon)
-- Orchestrator build: `npm run -w @yahoo-fantasy-bot/orchestrator build` → outputs to `apps/orchestrator/dist`
-- Orchestrator start: `npm run -w @yahoo-fantasy-bot/orchestrator start`
-- UI dev: `pip install streamlit sseclient-py requests` then `streamlit run apps/ui/app.py`
-- Prisma client/migrate: `cd packages/data && npx prisma generate && npx prisma migrate dev`
+## Build, Test, and Development Commands
+- Install deps: `npm install` (workspace-aware).
+- Orchestrator dev: `npm run -w @yahoo-fantasy-bot/orchestrator dev` (TS + nodemon).
+- Orchestrator build: `npm run -w @yahoo-fantasy-bot/orchestrator build` → outputs to `apps/orchestrator/dist`.
+- Orchestrator start: `npm run -w @yahoo-fantasy-bot/orchestrator start`.
+- UI dev: `pip install streamlit sseclient-py requests` then `streamlit run apps/ui/app.py`.
+- Prisma: `cd packages/data && npx prisma generate && npx prisma migrate dev`.
 
-## Configuration & Security
-- Copy env: `cp apps/orchestrator/env.example apps/orchestrator/.env` and set `DATABASE_URL`, `ALLOWED_ORIGINS`, Yahoo OAuth keys, `ANTHROPIC_API_KEY`, `AI_MODEL`, and `EXECUTION_MODE`.
-- Never commit secrets. Respect CORS in `ALLOWED_ORIGINS` to match your UI host.
-
-## Coding Style & Naming
-- TypeScript: strict mode (see `tsconfig.json`). Use 2‑space indent, semicolons, single quotes, and explicit types where reasonable.
-- Names: files/folders kebab/lowercase; functions/variables `camelCase`; types/interfaces `PascalCase`.
-- Keep modules focused: routes-only under `src/routes`, business logic in `src/agents`/`src/tools`, config in `src/config`.
-
-## AI Configuration
-- SDK: Vercel AI SDK (`ai`) with Anthropic provider (`@ai-sdk/anthropic`).
-- Model: configured in `apps/orchestrator/src/ai.ts`; override with `AI_MODEL`.
-
-## Execution Modes
-- `stage`: stage all recommendations in DB (default).
-- `dry-run`: compute results without writing to DB.
-- `live`: attempt execution for auto-eligible actions when league is post-draft.
+## Coding Style & Naming Conventions
+- TypeScript: strict mode enabled. Use 2‑space indent, semicolons, single quotes, and explicit types where reasonable.
+- Naming: files/folders kebab/lowercase; functions/variables `camelCase`; types/interfaces `PascalCase`.
+- Module boundaries: routes-only under `src/routes`; business logic in `src/agents`/`src/tools`; configuration in `src/config`.
 
 ## Testing Guidelines
-- No test suite yet. Prefer: Jest/Vitest for TypeScript; Pytest for the Streamlit helpers.
-- Place TS tests alongside code (`src/**/__tests__/*.test.ts`). Aim to unit test guards (e.g., `guards/shouldExecute.ts`) and route handlers.
+- Frameworks: prefer Jest/Vitest for TypeScript; Pytest for Streamlit helpers.
+- Location: place TS tests alongside code at `src/**/__tests__/*.test.ts`.
+- Focus: unit test guards (e.g., `guards/shouldExecute.ts`) and route handlers. Keep tests fast and deterministic.
+- Run: use your chosen runner locally; ensure builds pass and typecheck is clean before PR.
 
-## Commit & Pull Requests
+## Security & Configuration Tips
+- Env: copy `apps/orchestrator/env.example` to `.env` and set `DATABASE_URL`, `ALLOWED_ORIGINS`, Yahoo OAuth keys, `ANTHROPIC_API_KEY`, `AI_MODEL`, `EXECUTION_MODE`.
+- Secrets: never commit credentials; respect CORS via `ALLOWED_ORIGINS` to match your UI host.
+- AI: Vercel AI SDK with Anthropic; model configured in `apps/orchestrator/src/ai.ts` (override via `AI_MODEL`).
+- Execution modes: `stage` (default), `dry-run`, `live` for post-draft automation.
+
+## Commit & Pull Request Guidelines
 - Commits: use Conventional Commits (e.g., `feat: add daily report SSE`, `fix: oauth callback error handling`).
-- PRs: include a clear summary, linked issue (if any), setup/repro steps, and screenshots or curl examples for new endpoints. Note env or schema changes (`packages/data/prisma/schema.prisma`).
-- CI expectations: builds pass, typecheck clean, and new code covered by tests where added.
+- PRs: include a clear summary, linked issue (if any), setup/repro steps, and screenshots or curl examples for new endpoints. Note any env or schema changes (`packages/data/prisma/schema.prisma`). Ensure build + typecheck pass and new code is covered by tests where added.
+

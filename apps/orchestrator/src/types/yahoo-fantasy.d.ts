@@ -26,7 +26,7 @@ declare module 'yahoo-fantasy' {
       onRefresh: (tokenData: any) => void,
       redirectUri: string
     );
-    
+
     game: YahooFantasyClient['game'];
     league: YahooFantasyClient['league'];
     user: YahooFantasyClient['user'];

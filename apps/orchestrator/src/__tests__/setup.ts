@@ -5,11 +5,11 @@ import { beforeAll, afterAll, beforeEach, vi } from 'vitest';
 Object.assign(process.env, {
   NODE_ENV: 'test',
   YAHOO_CLIENT_ID: 'test_client_id',
-  YAHOO_CLIENT_SECRET: 'test_client_secret', 
+  YAHOO_CLIENT_SECRET: 'test_client_secret',
   YAHOO_REDIRECT_URI: 'http://localhost:3000/api/oauth/callback',
   ANTHROPIC_API_KEY: 'test_anthropic_key',
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
-  EXECUTION_MODE: 'dry-run'
+  EXECUTION_MODE: 'dry-run',
 });
 
 // Import Prisma mock to ensure it's set up before any database imports
@@ -43,4 +43,25 @@ afterAll(async () => {
 // Reset mocks before each test
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+// Block real network calls via axios by default in tests.
+// Tests can override specific calls by mocking axios per-suite when needed.
+vi.mock('axios', () => {
+  const mockReject = () => Promise.reject(new Error('Network error'));
+  const instance = {
+    get: vi.fn(mockReject),
+    post: vi.fn(mockReject),
+    put: vi.fn(mockReject),
+    interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+    request: vi.fn(mockReject),
+  } as any;
+  return {
+    default: {
+      create: vi.fn(() => instance),
+      get: vi.fn(mockReject),
+      post: vi.fn(mockReject),
+      put: vi.fn(mockReject),
+    },
+  };
 });

@@ -1,12 +1,13 @@
 import { Router } from 'express';
-import { healthCheck } from './health';
-import { dailyReport } from './reports';
-import { oauthStart, oauthCallback, tokenStatus, refreshNow } from './oauth';
-import { checkLineup } from './lineup';
-import { runWaivers } from './waivers';
+
 import { listPending, approve, reject } from './approvals';
-import { hourly } from './scheduler';
 import { handleChat } from './chat';
+import { healthCheck } from './health';
+import { checkLineup } from './lineup';
+import { oauthStart, oauthCallback, tokenStatus, refreshNow } from './oauth';
+import { dailyReport } from './reports';
+import { hourly } from './scheduler';
+import { runWaivers } from './waivers';
 
 const router = Router();
 
@@ -47,23 +48,23 @@ router.get('/', (req, res) => {
       health: '/health',
       oauth: {
         start: '/oauth/start',
-        callback: '/oauth/callback'
+        callback: '/oauth/callback',
       },
       reports: '/reports/daily',
       lineup: '/lineup/check',
       waivers: '/waivers/run',
       scheduler: {
-        hourly: '/scheduler/hourly'
+        hourly: '/scheduler/hourly',
       },
       approvals: {
         pending: '/approvals/pending',
         approve: '/approvals/approve',
-        reject: '/approvals/reject'
+        reject: '/approvals/reject',
       },
       chat: {
-        send: '/chat'
-      }
-    }
+        send: '/chat',
+      },
+    },
   });
 });
 

@@ -5,13 +5,13 @@ const createPrismaClient = () => {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     errorFormat: 'pretty',
-    
+
     // Connection configuration optimized for Supabase
     datasources: {
       db: {
-        url: process.env.DATABASE_URL
-      }
-    }
+        url: process.env.DATABASE_URL,
+      },
+    },
   });
 };
 
@@ -48,15 +48,15 @@ class DatabaseManager {
     try {
       console.log('🔄 Establishing database connection...');
       this._prisma = createPrismaClient();
-      
+
       // Test the connection with timeout
       await Promise.race([
         this._prisma.$connect(),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Database connection timeout')), 10000)
-        )
+        ),
       ]);
-      
+
       console.log('✅ Database connected successfully');
     } catch (error) {
       console.error('❌ Database connection failed:', error);
@@ -90,18 +90,15 @@ class DatabaseManager {
 
     try {
       const start = Date.now();
-      
+
       // Create timeout promise (5 seconds)
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Health check timeout after 5s')), 5000);
       });
-      
+
       // Race the query against timeout
-      await Promise.race([
-        this._prisma.$queryRaw`SELECT 1`,
-        timeoutPromise
-      ]);
-      
+      await Promise.race([this._prisma.$queryRaw`SELECT 1`, timeoutPromise]);
+
       const latency = Date.now() - start;
       return { healthy: true, latency };
     } catch (error: any) {
@@ -124,9 +121,8 @@ export const prisma = new Proxy({} as PrismaClient, {
       throw new Error('Database not connected. Call connectDatabase() first.');
     }
     return Reflect.get(dbManager.client, prop, receiver);
-  }
+  },
 });
 
 // For backwards compatibility, also export a direct client
 export const directPrisma = () => dbManager.client;
-

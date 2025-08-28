@@ -7,16 +7,16 @@ console.log('🔍 Yahoo Fantasy Bot Setup Checker\n');
 console.log('1. Checking environment variables...');
 const requiredEnvVars = [
   'YAHOO_CLIENT_ID',
-  'YAHOO_CLIENT_SECRET', 
+  'YAHOO_CLIENT_SECRET',
   'YAHOO_REDIRECT_URI',
   'ANTHROPIC_API_KEY',
-  'DATABASE_URL'
+  'DATABASE_URL',
 ];
 
-const envFile = require('dotenv').config({ path: '../../.env' });
+import 'dotenv/config';
 const missingVars: string[] = [];
 
-requiredEnvVars.forEach(varName => {
+requiredEnvVars.forEach((varName) => {
   const value = process.env[varName];
   if (value) {
     console.log(`   ✅ ${varName}: ${value.substring(0, 10)}...`);

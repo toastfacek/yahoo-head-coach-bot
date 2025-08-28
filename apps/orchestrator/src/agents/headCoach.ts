@@ -3,15 +3,16 @@
 // - Wires tool calling order: scout -> analyst -> executor -> historian
 // - Streams text back to callers (SSE route uses textStream)
 import { streamText, tool } from 'ai';
-import { model } from '../ai';
-import { POLICY } from '../config/policy';
-import { env } from '../config/env';
 import { z } from 'zod';
-import { scout } from '../tools/scout';
+
+import { model } from '../ai';
+import { env } from '../config/env';
+import { POLICY } from '../config/policy';
 import { analyze } from '../tools/analyst';
 import { proposeOrExecute } from '../tools/executor';
 import { record } from '../tools/historian';
 import { recall } from '../tools/recall';
+import { scout } from '../tools/scout';
 
 // Build the system prompt once per run with live policy/mode values
 function buildSystem(): string {
@@ -24,7 +25,7 @@ function buildSystem(): string {
     '',
     'Conversational Mode: When responding to direct user questions:',
     '- Answer conversationally and helpfully',
-    '- Use tools as needed to get current data (scout, analyst)',  
+    '- Use tools as needed to get current data (scout, analyst)',
     '- Provide specific, actionable fantasy football advice',
     '- Reference real player names, matchups, and statistics when available',
     '- Maintain professional but friendly tone',
@@ -68,9 +69,15 @@ function buildSystem(): string {
   ].join('\n');
 }
 
-export async function runHeadCoach({ leagueId, userId, intent, userMessage }:{
-  leagueId: string; userId: string;
-  intent: 'DAILY_REPORT'|'WEEKLY_WAIVERS'|'LINEUP_CHECK'|'ON_DEMAND'|'WEEKLY_SUMMARY';
+export async function runHeadCoach({
+  leagueId,
+  userId,
+  intent,
+  userMessage,
+}: {
+  leagueId: string;
+  userId: string;
+  intent: 'DAILY_REPORT' | 'WEEKLY_WAIVERS' | 'LINEUP_CHECK' | 'ON_DEMAND' | 'WEEKLY_SUMMARY';
   userMessage?: string;
 }) {
   // Compose the final system prompt with current policy + mode
@@ -82,44 +89,63 @@ export async function runHeadCoach({ leagueId, userId, intent, userMessage }:{
       model,
       system,
       messages: [
-        { role: 'user', content: userMessage || buildUserInstruction({ intent, leagueId, userId }) }
+        {
+          role: 'user',
+          content: userMessage || buildUserInstruction({ intent, leagueId, userId }),
+        },
       ],
       tools: {
         // Fetch recent memory (last reports/goals/todos) to inform planning and progress checks
         recall: tool({
-          description: 'Recall recent memory and recommendations to ground planning and progress checks.',
-          inputSchema: z.object({ leagueId: z.string(), kinds: z.array(z.string()).optional(), includeRecommendations: z.boolean().optional(), includeDecisions: z.boolean().optional(), limit: z.number().int().min(1).max(50).optional() }),
-          execute: (i) => recall(i as any)
+          description:
+            'Recall recent memory and recommendations to ground planning and progress checks.',
+          inputSchema: z.object({
+            leagueId: z.string(),
+            kinds: z.array(z.string()).optional(),
+            includeRecommendations: z.boolean().optional(),
+            includeDecisions: z.boolean().optional(),
+            limit: z.number().int().min(1).max(50).optional(),
+          }),
+          execute: (i) => recall(i as any),
         }),
         // Collect signals (uses Yahoo reads)
         scout: tool({
           description: 'Collect signals (news/injuries/sentiment/vegas/weather).',
           inputSchema: z.object({ leagueId: z.string() }),
-          execute: ({ leagueId }) => scout({ leagueId })
+          execute: ({ leagueId }) => scout({ leagueId }),
         }),
         // Turn signals into normalized actions with confidence
         analyst: tool({
-          description: 'Turn signals + roster into lineup & waiver plans with confidence. Prefer passing prior scout() output as { scout } to avoid re-fetching.',
+          description:
+            'Turn signals + roster into lineup & waiver plans with confidence. Prefer passing prior scout() output as { scout } to avoid re-fetching.',
           inputSchema: z.object({
             leagueId: z.string(),
             window: z.string().optional(),
-            scout: z.any().optional()
+            scout: z.any().optional(),
           }),
-          execute: (i) => analyze(i)
+          execute: (i) => analyze(i),
         }),
         // Stage or execute per policy + EXECUTION_MODE (server-enforced)
         executor: tool({
           description: 'Stage or execute actions via Yahoo, applying policy guard.',
-          inputSchema: z.object({ leagueId: z.string(), userId: z.string(), actions: z.array(z.any()) }),
-          execute: (i) => proposeOrExecute(i)
+          inputSchema: z.object({
+            leagueId: z.string(),
+            userId: z.string(),
+            actions: z.array(z.any()),
+          }),
+          execute: (i) => proposeOrExecute(i),
         }),
         // Persist an audit trail of the run
         historian: tool({
           description: 'Persist recommendations/decisions for audit & learning.',
-          inputSchema: z.object({ leagueId: z.string(), payload: z.any(), kind: z.string().optional() }),
-          execute: (i) => record(i)
-        })
-      }
+          inputSchema: z.object({
+            leagueId: z.string(),
+            payload: z.any(),
+            kind: z.string().optional(),
+          }),
+          execute: (i) => record(i),
+        }),
+      },
     });
   } catch (err) {
     console.error('HeadCoach agent error:', err);
@@ -127,7 +153,15 @@ export async function runHeadCoach({ leagueId, userId, intent, userMessage }:{
   }
 }
 
-function buildUserInstruction({ intent, leagueId, userId }:{ intent:string; leagueId:string; userId:string }) {
+function buildUserInstruction({
+  intent,
+  leagueId,
+  userId,
+}: {
+  intent: string;
+  leagueId: string;
+  userId: string;
+}) {
   if (intent === 'WEEKLY_SUMMARY') {
     return [
       `Intent=${intent}; leagueId=${leagueId}; userId=${userId}.`,
@@ -136,7 +170,7 @@ function buildUserInstruction({ intent, leagueId, userId }:{ intent:string; leag
       '- Assess progress. Generate a clear weekly goal (one sentence).',
       '- Propose concrete todos for the coming week (3–5 items).',
       '- Use historian(kind="weekly_goal"|"todo") to persist goal/todos.',
-      'Output: Summary, Goal, Todos, Notes (concise, Markdown).'
+      'Output: Summary, Goal, Todos, Notes (concise, Markdown).',
     ].join('\n');
   }
 

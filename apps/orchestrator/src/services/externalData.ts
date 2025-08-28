@@ -72,10 +72,10 @@ export interface InjuryReport {
 
 /**
  * External Data Service - Centralized access to external fantasy football data
- * 
+ *
  * This service provides standardized interfaces to various external data sources
  * including news aggregation, weather conditions, Vegas lines, and expert rankings.
- * 
+ *
  * Rube MCP Integration: Weather and Vegas data now use live APIs via Rube tools.
  * Social intelligence and news aggregation leverage Reddit search and web scraping.
  */
@@ -85,12 +85,14 @@ export class ExternalDataService {
   private cacheTTL: number; // seconds
   private rubeEnabled: boolean;
 
-  constructor(config: {
-    apiKeys?: Record<string, string>;
-    cacheEnabled?: boolean;
-    cacheTTL?: number;
-    rubeEnabled?: boolean;
-  } = {}) {
+  constructor(
+    config: {
+      apiKeys?: Record<string, string>;
+      cacheEnabled?: boolean;
+      cacheTTL?: number;
+      rubeEnabled?: boolean;
+    } = {}
+  ) {
     this.apiKeys = config.apiKeys || {};
     this.cacheEnabled = config.cacheEnabled ?? true;
     this.cacheTTL = config.cacheTTL || 300; // 5 minutes default
@@ -100,23 +102,25 @@ export class ExternalDataService {
   /**
    * Execute Rube MCP tools for data gathering
    */
-  private async executeRubeTools(tools: Array<{ tool_slug: string; arguments: any }>): Promise<any> {
+  private async executeRubeTools(
+    tools: Array<{ tool_slug: string; arguments: any }>
+  ): Promise<any> {
     if (!this.rubeEnabled) {
       throw new Error('Rube MCP integration disabled');
     }
-    
+
     try {
       // This would use the actual Rube MCP client in production
       // For now, we'll simulate the structure until MCP integration is complete
       console.log('Rube MCP tools execution:', tools);
-      
+
       // Mock response structure for development
       return {
-        results: tools.map(tool => ({
+        results: tools.map((tool) => ({
           tool_slug: tool.tool_slug,
           success: true,
-          data: this.getWebSearchDataForTool(tool.tool_slug, tool.arguments)
-        }))
+          data: this.getWebSearchDataForTool(tool.tool_slug, tool.arguments),
+        })),
       };
     } catch (error) {
       console.error('Rube MCP execution error:', error);
@@ -132,60 +136,67 @@ export class ExternalDataService {
       case 'WEB_SEARCH':
         // Return structured data as if from web search results
         const query = args.query || '';
-        
+
         if (query.includes('weather')) {
           return {
-            location: query.includes('Chicago') ? 'Chicago, IL' : 
-                     query.includes('Miami') ? 'Miami, FL' : 'Unknown',
-            temperature: query.includes('Chicago') ? Math.floor(Math.random() * 30) + 20 :
-                        query.includes('Miami') ? Math.floor(Math.random() * 20) + 70 :
-                        Math.floor(Math.random() * 40) + 35,
+            location: query.includes('Chicago')
+              ? 'Chicago, IL'
+              : query.includes('Miami')
+                ? 'Miami, FL'
+                : 'Unknown',
+            temperature: query.includes('Chicago')
+              ? Math.floor(Math.random() * 30) + 20
+              : query.includes('Miami')
+                ? Math.floor(Math.random() * 20) + 70
+                : Math.floor(Math.random() * 40) + 35,
             wind_speed: Math.floor(Math.random() * 20) + 5,
-            wind_direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.floor(Math.random() * 8)],
+            wind_direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][
+              Math.floor(Math.random() * 8)
+            ],
             precipitation_chance: Math.floor(Math.random() * 80),
-            conditions: query.includes('Chicago') ? 
-              ['cloudy', 'rain', 'snow'][Math.floor(Math.random() * 3)] :
-              ['clear', 'cloudy', 'rain'][Math.floor(Math.random() * 3)],
-            source: 'Weather Web Search'
+            conditions: query.includes('Chicago')
+              ? ['cloudy', 'rain', 'snow'][Math.floor(Math.random() * 3)]
+              : ['clear', 'cloudy', 'rain'][Math.floor(Math.random() * 3)],
+            source: 'Weather Web Search',
           };
         }
-        
+
         if (query.includes('betting') || query.includes('odds') || query.includes('spread')) {
           return {
             spread: Math.round((Math.random() - 0.5) * 14 * 2) / 2, // -7 to +7, rounded to 0.5
             total: Math.round((Math.floor(Math.random() * 18) + 42) * 2) / 2, // 42-60, rounded to 0.5
             moneyline_home: Math.floor(Math.random() * 300) - 150,
             moneyline_away: Math.floor(Math.random() * 300) - 150,
-            source: 'Sportsbook Web Search'
+            source: 'Sportsbook Web Search',
           };
         }
-        
+
         if (query.includes('fantasy football') || query.includes('injury')) {
           return {
             title: `Fantasy Football Update: ${query.split(' ').slice(0, 3).join(' ')}`,
             content: `Web search results for: ${query}`,
             impact: 'medium',
-            source: 'Fantasy Web Search'
+            source: 'Fantasy Web Search',
           };
         }
-        
+
         // Generic web search result
         return {
           title: query,
           results: ['Web search result 1', 'Web search result 2'],
-          source: 'Web Search'
+          source: 'Web Search',
         };
-        
+
       case 'REDDIT_SEARCH_ACROSS_SUBREDDITS':
         return {
           posts: [
             { title: `Discussion: ${args.search_query}`, score: Math.floor(Math.random() * 100) },
-            { title: `Analysis: ${args.search_query}`, score: Math.floor(Math.random() * 50) }
+            { title: `Analysis: ${args.search_query}`, score: Math.floor(Math.random() * 50) },
           ],
           sentiment: Math.random() > 0.5 ? 'positive' : 'concerned',
-          source: 'Reddit Search'
+          source: 'Reddit Search',
         };
-        
+
       default:
         return { message: `Web search simulation for ${toolSlug}`, source: 'Web Search Fallback' };
     }
@@ -204,61 +215,63 @@ export class ExternalDataService {
     limit?: number;
   }): Promise<NewsItem[]> {
     console.log('ExternalDataService.getFantasyNews called with:', filters);
-    
+
     if (!this.rubeEnabled) {
       return this.getWebSearchNewsData(filters);
     }
 
     try {
       const newsTools = [];
-      
+
       // Add web search for general fantasy football news
       newsTools.push({
         tool_slug: 'WEB_SEARCH',
         arguments: {
-          query: `fantasy football news today injuries ${filters.positions?.join(' ') || 'NFL'}`
-        }
+          query: `fantasy football news today injuries ${filters.positions?.join(' ') || 'NFL'}`,
+        },
       });
 
       // Add specific player searches if provided
       if (filters.players?.length) {
-        for (const player of filters.players.slice(0, 3)) { // Limit to avoid too many calls
+        for (const player of filters.players.slice(0, 3)) {
+          // Limit to avoid too many calls
           newsTools.push({
             tool_slug: 'WEB_SEARCH',
             arguments: {
-              query: `${player} fantasy football injury news today`
-            }
+              query: `${player} fantasy football injury news today`,
+            },
           });
         }
       }
 
       const rubeResults = await this.executeRubeTools(newsTools);
-      
+
       // Transform search results into NewsItem format
       const newsItems: NewsItem[] = rubeResults.results.map((result: any, index: number) => {
         // In production, this would parse actual news content from search results
         const searchData = this.getWebSearchDataForTool('WEB_SEARCH', {
-          query: `fantasy football news ${filters.players?.[index] || 'injuries'} today`
+          query: `fantasy football news ${filters.players?.[index] || 'injuries'} today`,
         });
-        
+
         return {
           id: `news_web_${index}_${Date.now()}`,
           title: `Live News Update: ${searchData?.title || 'Fantasy Football Update'}`,
-          content: searchData?.content || 'Latest fantasy football developments based on web search',
+          content:
+            searchData?.content || 'Latest fantasy football developments based on web search',
           player_ids: filters.players || [],
           team_ids: filters.teams || [],
           tags: ['live', 'web_search', ...(filters.positions || [])],
           impact_level: 'medium',
           timestamp: new Date().toISOString(),
           source: 'Web Search',
-          reliability_score: 75
+          reliability_score: 75,
         };
       });
 
       // Apply filters
       let filtered = newsItems;
       if (filters.impact_level?.length) {
-        filtered = filtered.filter(item => filters.impact_level!.includes(item.impact_level));
+        filtered = filtered.filter((item) => filters.impact_level!.includes(item.impact_level));
       }
       if (filters.limit) {
         filtered = filtered.slice(0, filters.limit);
@@ -275,30 +288,32 @@ export class ExternalDataService {
    * Get social intelligence from Reddit for player discussions
    * Will be enhanced in Phase 2 of Rube integration
    */
-  async getRedditSentiment(players: string[]): Promise<Array<{player: string; sentiment: string; posts: any[]}>> {
+  async getRedditSentiment(
+    players: string[]
+  ): Promise<Array<{ player: string; sentiment: string; posts: any[] }>> {
     console.log('ExternalDataService.getRedditSentiment called for:', players);
-    
+
     if (!this.rubeEnabled || !players.length) {
       return [];
     }
 
     try {
       // Search Reddit for player discussions
-      const redditTools = players.slice(0, 5).map(player => ({
+      const redditTools = players.slice(0, 5).map((player) => ({
         tool_slug: 'REDDIT_SEARCH_ACROSS_SUBREDDITS',
         arguments: {
           search_query: `${player} fantasy football injury news`,
           limit: 10,
-          sort: 'relevance'
-        }
+          sort: 'relevance',
+        },
       }));
 
       const rubeResults = await this.executeRubeTools(redditTools);
-      
+
       return rubeResults.results.map((result: any, index: number) => ({
         player: players[index],
         sentiment: 'neutral', // Would analyze actual post sentiment
-        posts: result.data?.posts || []
+        posts: result.data?.posts || [],
       }));
     } catch (error) {
       console.error('Reddit sentiment analysis failed:', error);
@@ -312,10 +327,10 @@ export class ExternalDataService {
   private async getWebSearchNewsData(filters: any): Promise<NewsItem[]> {
     try {
       console.log('Falling back to web search for news data');
-      
+
       // Build search queries based on filters
       const searchQueries = [];
-      
+
       if (filters.players?.length) {
         // Search for specific player news
         filters.players.slice(0, 3).forEach((player: string) => {
@@ -328,15 +343,15 @@ export class ExternalDataService {
           searchQueries.push(`${filters.positions.join(' ')} fantasy football news today`);
         }
       }
-      
+
       // Execute web searches (simulated structure for now)
       const newsItems: NewsItem[] = [];
-      
+
       for (let i = 0; i < Math.min(searchQueries.length, filters.limit || 5); i++) {
         const query = searchQueries[i];
         // In production, this would execute actual web search
         // For now, we create structured news items based on search intent
-        
+
         newsItems.push({
           id: `websearch_news_${i}_${Date.now()}`,
           title: `Fantasy News: ${query.split(' ').slice(0, 3).join(' ')} Update`,
@@ -347,26 +362,28 @@ export class ExternalDataService {
           impact_level: i === 0 ? 'high' : 'medium', // First result tends to be most relevant
           timestamp: new Date().toISOString(),
           source: 'Web Search',
-          reliability_score: 70 // Lower than direct API but better than static mock
+          reliability_score: 70, // Lower than direct API but better than static mock
         });
       }
-      
+
       return newsItems;
     } catch (error) {
       console.error('Web search fallback failed, using minimal data:', error);
       // Ultimate fallback - minimal structured data
-      return [{
-        id: `fallback_${Date.now()}`,
-        title: 'Fantasy Football News Update',
-        content: 'Unable to retrieve current news - check official sources',
-        player_ids: filters.players || [],
-        team_ids: filters.teams || [],
-        tags: ['fallback'],
-        impact_level: 'low',
-        timestamp: new Date().toISOString(),
-        source: 'System Fallback',
-        reliability_score: 30
-      }];
+      return [
+        {
+          id: `fallback_${Date.now()}`,
+          title: 'Fantasy Football News Update',
+          content: 'Unable to retrieve current news - check official sources',
+          player_ids: filters.players || [],
+          team_ids: filters.teams || [],
+          tags: ['fallback'],
+          impact_level: 'low',
+          timestamp: new Date().toISOString(),
+          source: 'System Fallback',
+          reliability_score: 30,
+        },
+      ];
     }
   }
 
@@ -380,7 +397,7 @@ export class ExternalDataService {
     outdoor_only?: boolean;
   }): Promise<WeatherData[]> {
     console.log('ExternalDataService.getWeatherData called with:', filters);
-    
+
     if (!this.rubeEnabled) {
       // Fallback to web search when Rube is disabled
       return this.getWebSearchWeatherData(filters);
@@ -389,22 +406,22 @@ export class ExternalDataService {
     try {
       // Get NFL game locations for current week
       const gameLocations = await this.getNFLGameLocations(filters.week);
-      
+
       // Execute weather API calls for each game location
-      const weatherTools = gameLocations.map(game => ({
+      const weatherTools = gameLocations.map((game) => ({
         tool_slug: 'WEB_SEARCH',
         arguments: {
-          query: `${game.location} weather conditions NFL game today forecast`
-        }
+          query: `${game.location} weather conditions NFL game today forecast`,
+        },
       }));
 
       const rubeResults = await this.executeRubeTools(weatherTools);
-      
+
       // Transform Rube results into WeatherData format
       const weatherData: WeatherData[] = rubeResults.results.map((result: any, index: number) => {
         const game = gameLocations[index];
         const weather = result.data;
-        
+
         return {
           game_id: game.game_id,
           location: game.location,
@@ -415,17 +432,17 @@ export class ExternalDataService {
           precipitation_type: weather.precipitation_type,
           dome: game.dome,
           field_conditions: this.assessFieldConditions(weather),
-          visibility: weather.visibility || 10
+          visibility: weather.visibility || 10,
         };
       });
 
       // Apply filters
       let filtered = weatherData;
       if (filters.outdoor_only) {
-        filtered = filtered.filter(w => !w.dome);
+        filtered = filtered.filter((w) => !w.dome);
       }
       if (filters.game_ids?.length) {
-        filtered = filtered.filter(w => filters.game_ids!.includes(w.game_id));
+        filtered = filtered.filter((w) => filters.game_ids!.includes(w.game_id));
       }
 
       return filtered;
@@ -441,79 +458,93 @@ export class ExternalDataService {
   private async getWebSearchWeatherData(filters: any): Promise<WeatherData[]> {
     try {
       console.log('Falling back to web search for weather data');
-      
+
       // Get common NFL game locations for weather searches
       const gameLocations = await this.getNFLGameLocations(filters.week);
-      
+
       const weatherData: WeatherData[] = [];
-      
-      for (const game of gameLocations.slice(0, 4)) { // Limit searches to avoid too many calls
+
+      for (const game of gameLocations.slice(0, 4)) {
+        // Limit searches to avoid too many calls
         // In production, would execute: `${game.location} weather forecast NFL game conditions today`
         // For now, generate structured weather based on location characteristics
-        
-        const isNorthern = ['Green Bay', 'Buffalo', 'Chicago', 'Detroit', 'Pittsburgh', 'Cleveland'].some(city => 
+
+        const isNorthern = [
+          'Green Bay',
+          'Buffalo',
+          'Chicago',
+          'Detroit',
+          'Pittsburgh',
+          'Cleveland',
+        ].some((city) => game.location.includes(city));
+        const isSouthern = ['Miami', 'Tampa', 'Jacksonville', 'Houston', 'Phoenix'].some((city) =>
           game.location.includes(city)
         );
-        const isSouthern = ['Miami', 'Tampa', 'Jacksonville', 'Houston', 'Phoenix'].some(city => 
-          game.location.includes(city)
-        );
-        
+
         weatherData.push({
           game_id: game.game_id,
           location: game.location,
-          temperature: isNorthern ? Math.floor(Math.random() * 30) + 20 : // 20-50°F
-                      isSouthern ? Math.floor(Math.random() * 20) + 70 : // 70-90°F
-                      Math.floor(Math.random() * 40) + 35, // 35-75°F
+          temperature: isNorthern
+            ? Math.floor(Math.random() * 30) + 20 // 20-50°F
+            : isSouthern
+              ? Math.floor(Math.random() * 20) + 70 // 70-90°F
+              : Math.floor(Math.random() * 40) + 35, // 35-75°F
           wind_speed: Math.floor(Math.random() * 15) + 5, // 5-20 mph
-          wind_direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.floor(Math.random() * 8)],
+          wind_direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][
+            Math.floor(Math.random() * 8)
+          ],
           precipitation_chance: Math.floor(Math.random() * 80), // 0-80%
           precipitation_type: isNorthern && Math.random() > 0.7 ? 'snow' : 'rain',
           dome: game.dome,
           field_conditions: this.assessFieldConditionsFromSearch(game.location),
-          visibility: Math.floor(Math.random() * 8) + 3 // 3-10 miles
+          visibility: Math.floor(Math.random() * 8) + 3, // 3-10 miles
         });
       }
-      
+
       // Apply filters
       let filtered = weatherData;
       if (filters.outdoor_only) {
-        filtered = filtered.filter(w => !w.dome);
+        filtered = filtered.filter((w) => !w.dome);
       }
       if (filters.game_ids?.length) {
-        filtered = filtered.filter(w => filters.game_ids!.includes(w.game_id));
+        filtered = filtered.filter((w) => filters.game_ids!.includes(w.game_id));
       }
-      
+
       return filtered;
     } catch (error) {
       console.error('Web search weather fallback failed:', error);
       // Ultimate fallback - generic conditions
-      return [{
-        game_id: 'fallback_001',
-        location: 'Unknown',
-        temperature: 60,
-        wind_speed: 10,
-        wind_direction: 'Variable',
-        precipitation_chance: 30,
-        dome: false,
-        field_conditions: 'good',
-        visibility: 10
-      }];
+      return [
+        {
+          game_id: 'fallback_001',
+          location: 'Unknown',
+          temperature: 60,
+          wind_speed: 10,
+          wind_direction: 'Variable',
+          precipitation_chance: 30,
+          dome: false,
+          field_conditions: 'good',
+          visibility: 10,
+        },
+      ];
     }
   }
-  
+
   /**
    * Assess field conditions from location-based web search context
    */
-  private assessFieldConditionsFromSearch(location: string): 'excellent' | 'good' | 'fair' | 'poor' {
+  private assessFieldConditionsFromSearch(
+    location: string
+  ): 'excellent' | 'good' | 'fair' | 'poor' {
     // In production, would parse actual weather search results
     // For now, make educated guesses based on location and season
     const knownPoorConditions = ['Chicago', 'Green Bay', 'Buffalo', 'Cleveland'];
     const knownGoodConditions = ['Miami', 'Tampa', 'Arizona', 'Los Angeles'];
-    
-    if (knownPoorConditions.some(city => location.includes(city))) {
+
+    if (knownPoorConditions.some((city) => location.includes(city))) {
       return Math.random() > 0.5 ? 'fair' : 'poor';
     }
-    if (knownGoodConditions.some(city => location.includes(city))) {
+    if (knownGoodConditions.some((city) => location.includes(city))) {
       return Math.random() > 0.7 ? 'excellent' : 'good';
     }
     return 'good'; // Default assumption
@@ -522,14 +553,16 @@ export class ExternalDataService {
   /**
    * Get NFL game locations for weather lookups
    */
-  private async getNFLGameLocations(week?: number): Promise<Array<{game_id: string; location: string; dome: boolean}>> {
+  private async getNFLGameLocations(
+    _week?: number
+  ): Promise<Array<{ game_id: string; location: string; dome: boolean }>> {
     // This would normally query NFL schedule data
     // For now, return sample games
     return [
       { game_id: 'nfl_001', location: 'Green Bay, WI', dome: false },
       { game_id: 'nfl_002', location: 'Detroit, MI', dome: true },
       { game_id: 'nfl_003', location: 'Buffalo, NY', dome: false },
-      { game_id: 'nfl_004', location: 'Miami, FL', dome: false }
+      { game_id: 'nfl_004', location: 'Miami, FL', dome: false },
     ];
   }
 
@@ -553,7 +586,7 @@ export class ExternalDataService {
     season?: number;
   }): Promise<VegasLine[]> {
     console.log('ExternalDataService.getVegasLines called with:', filters);
-    
+
     if (!this.rubeEnabled) {
       // Fallback to web search when Rube is disabled
       return this.getWebSearchVegasLines(filters);
@@ -562,31 +595,31 @@ export class ExternalDataService {
     try {
       // Get current NFL games for betting line lookups
       const currentGames = await this.getCurrentNFLGames(filters.week);
-      
+
       // Execute web searches for betting lines via Rube
-      const vegasTools = currentGames.map(game => ({
+      const vegasTools = currentGames.map((game) => ({
         tool_slug: 'WEB_SEARCH',
         arguments: {
-          query: `${game.away_team} vs ${game.home_team} betting lines spread total points NFL odds`
-        }
+          query: `${game.away_team} vs ${game.home_team} betting lines spread total points NFL odds`,
+        },
       }));
 
       const rubeResults = await this.executeRubeTools(vegasTools);
-      
+
       // Transform Rube search results into VegasLine format
       const vegasLines: VegasLine[] = rubeResults.results.map((result: any, index: number) => {
         const game = currentGames[index];
         const searchLine = this.getWebSearchDataForTool('WEB_SEARCH', {
-          query: `${game.away_team} vs ${game.home_team} betting odds spread over under`
+          query: `${game.away_team} vs ${game.home_team} betting odds spread over under`,
         });
-        
+
         // In production, this would parse betting data from search results
         // For now, we'll use web search simulation based on game matchups
         const spread = searchLine.spread;
         const total = searchLine.total;
         const homeScore = total / 2 - spread / 2;
         const awayScore = total / 2 + spread / 2;
-        
+
         return {
           game_id: game.game_id,
           home_team: game.home_team,
@@ -598,14 +631,14 @@ export class ExternalDataService {
           moneyline_home: this.spreadToMoneyline(spread),
           moneyline_away: this.spreadToMoneyline(-spread),
           updated_at: new Date().toISOString(),
-          source: 'Live Web Search'
+          source: 'Live Web Search',
         };
       });
 
       // Apply filters
       let filtered = vegasLines;
       if (filters.game_ids?.length) {
-        filtered = filtered.filter(line => filters.game_ids!.includes(line.game_id));
+        filtered = filtered.filter((line) => filters.game_ids!.includes(line.game_id));
       }
 
       return filtered;
@@ -621,26 +654,27 @@ export class ExternalDataService {
   private async getWebSearchVegasLines(filters: any): Promise<VegasLine[]> {
     try {
       console.log('Falling back to web search for Vegas lines');
-      
+
       // Get current NFL matchups for betting line searches
       const currentGames = await this.getCurrentNFLGames(filters.week);
-      
+
       const vegasLines: VegasLine[] = [];
-      
-      for (const game of currentGames.slice(0, 4)) { // Limit searches
+
+      for (const game of currentGames.slice(0, 4)) {
+        // Limit searches
         // In production, would execute: `${game.away_team} vs ${game.home_team} betting odds spread over under`
         // For now, generate realistic betting lines based on team matchups
-        
+
         // Generate realistic spread (-14 to +14, usually -7 to +7)
         const spread = (Math.random() - 0.5) * 14; // -7 to +7 typical range
-        
+
         // Generate realistic total (35-60 points, usually 42-52)
         const total = Math.floor(Math.random() * 18) + 42; // 42-60 range
-        
+
         // Calculate implied scores
         const homeScore = total / 2 - spread / 2;
         const awayScore = total / 2 + spread / 2;
-        
+
         vegasLines.push({
           game_id: game.game_id,
           home_team: game.home_team,
@@ -652,47 +686,51 @@ export class ExternalDataService {
           moneyline_home: this.spreadToMoneyline(spread),
           moneyline_away: this.spreadToMoneyline(-spread),
           updated_at: new Date().toISOString(),
-          source: 'Web Search Estimate'
+          source: 'Web Search Estimate',
         });
       }
-      
+
       // Apply filters
       let filtered = vegasLines;
       if (filters.game_ids?.length) {
-        filtered = filtered.filter(line => filters.game_ids!.includes(line.game_id));
+        filtered = filtered.filter((line) => filters.game_ids!.includes(line.game_id));
       }
-      
+
       return filtered;
     } catch (error) {
       console.error('Web search Vegas lines fallback failed:', error);
       // Ultimate fallback - neutral betting line
-      return [{
-        game_id: 'fallback_001',
-        home_team: 'HOME',
-        away_team: 'AWAY',
-        spread: 0,
-        total_points: 45,
-        home_implied_score: 22.5,
-        away_implied_score: 22.5,
-        moneyline_home: -110,
-        moneyline_away: -110,
-        updated_at: new Date().toISOString(),
-        source: 'System Fallback'
-      }];
+      return [
+        {
+          game_id: 'fallback_001',
+          home_team: 'HOME',
+          away_team: 'AWAY',
+          spread: 0,
+          total_points: 45,
+          home_implied_score: 22.5,
+          away_implied_score: 22.5,
+          moneyline_home: -110,
+          moneyline_away: -110,
+          updated_at: new Date().toISOString(),
+          source: 'System Fallback',
+        },
+      ];
     }
   }
 
   /**
    * Get current NFL games for betting line lookups
    */
-  private async getCurrentNFLGames(week?: number): Promise<Array<{game_id: string; home_team: string; away_team: string}>> {
+  private async getCurrentNFLGames(
+    _week?: number
+  ): Promise<Array<{ game_id: string; home_team: string; away_team: string }>> {
     // This would normally query NFL schedule data
     // For now, return sample matchups
     return [
       { game_id: 'nfl_001', home_team: 'GB', away_team: 'CHI' },
       { game_id: 'nfl_002', home_team: 'DET', away_team: 'MIN' },
       { game_id: 'nfl_003', home_team: 'BUF', away_team: 'MIA' },
-      { game_id: 'nfl_004', home_team: 'KC', away_team: 'LV' }
+      { game_id: 'nfl_004', home_team: 'KC', away_team: 'LV' },
     ];
   }
 
@@ -703,10 +741,10 @@ export class ExternalDataService {
     if (spread === 0) return -110;
     if (spread < 0) {
       // Favorite
-      return Math.round(-110 - (Math.abs(spread) * 15));
+      return Math.round(-110 - Math.abs(spread) * 15);
     } else {
       // Underdog
-      return Math.round(100 + (spread * 25));
+      return Math.round(100 + spread * 25);
     }
   }
 
@@ -722,7 +760,7 @@ export class ExternalDataService {
     limit?: number;
   }): Promise<ExpertRanking[]> {
     console.log('ExternalDataService.getExpertRankings called with:', filters);
-    
+
     // Stub implementation - Phase 3 will aggregate expert sources
     const mockRankings: ExpertRanking[] = [
       {
@@ -735,28 +773,28 @@ export class ExternalDataService {
         projected_points: 18.7,
         confidence: 88,
         expert_source: 'FantasyPros',
-        notes: 'Strong TD upside in favorable matchup'
+        notes: 'Strong TD upside in favorable matchup',
       },
       {
         player_id: 'player_789',
         player_name: 'Tyreek Hill',
-        position: 'WR', 
+        position: 'WR',
         week: filters.week || 1,
         rank: 3,
         tier: 1,
         projected_points: 21.4,
         confidence: 92,
         expert_source: 'ESPN',
-        notes: 'Elite ceiling in high-scoring game environment'
-      }
+        notes: 'Elite ceiling in high-scoring game environment',
+      },
     ];
 
     let filtered = mockRankings;
     if (filters.positions?.length) {
-      filtered = filtered.filter(r => filters.positions!.includes(r.position));
+      filtered = filtered.filter((r) => filters.positions!.includes(r.position));
     }
     if (filters.min_confidence) {
-      filtered = filtered.filter(r => r.confidence >= filters.min_confidence!);
+      filtered = filtered.filter((r) => r.confidence >= filters.min_confidence!);
     }
     if (filters.limit) {
       filtered = filtered.slice(0, filters.limit);
@@ -777,7 +815,7 @@ export class ExternalDataService {
     updated_since?: string;
   }): Promise<InjuryReport[]> {
     console.log('ExternalDataService.getInjuryReports called with:', filters);
-    
+
     // Stub implementation - Phase 3 will integrate injury report APIs
     const mockReports: InjuryReport[] = [
       {
@@ -792,7 +830,7 @@ export class ExternalDataService {
         practice_status: ['DNP', 'LIMITED', 'LIMITED'],
         impact_assessment: 'Trending toward playing but workload may be limited',
         fantasy_outlook: 'Risky start with reduced ceiling if active',
-        last_updated: new Date().toISOString()
+        last_updated: new Date().toISOString(),
       },
       {
         player_id: 'player_456',
@@ -807,19 +845,19 @@ export class ExternalDataService {
         practice_status: ['DNP', 'DNP', 'DNP'],
         impact_assessment: 'Significant injury requiring multi-week absence',
         fantasy_outlook: 'Must drop/bench until return confirmed',
-        last_updated: new Date(Date.now() - 86400000).toISOString()
-      }
+        last_updated: new Date(Date.now() - 86400000).toISOString(),
+      },
     ];
 
     let filtered = mockReports;
     if (filters.player_ids?.length) {
-      filtered = filtered.filter(r => filters.player_ids!.includes(r.player_id));
+      filtered = filtered.filter((r) => filters.player_ids!.includes(r.player_id));
     }
     if (filters.positions?.length) {
-      filtered = filtered.filter(r => filters.positions!.includes(r.position));
+      filtered = filtered.filter((r) => filters.positions!.includes(r.position));
     }
     if (filters.statuses?.length) {
-      filtered = filtered.filter(r => filters.statuses!.includes(r.status));
+      filtered = filtered.filter((r) => filters.statuses!.includes(r.status));
     }
 
     return filtered;
@@ -828,7 +866,10 @@ export class ExternalDataService {
   /**
    * Aggregate multiple data sources for comprehensive player analysis
    */
-  async getPlayerAnalysisData(playerIds: string[], week?: number): Promise<{
+  async getPlayerAnalysisData(
+    playerIds: string[],
+    week?: number
+  ): Promise<{
     players: Array<{
       player_id: string;
       news: NewsItem[];
@@ -839,29 +880,29 @@ export class ExternalDataService {
     }>;
   }> {
     console.log('ExternalDataService.getPlayerAnalysisData called for players:', playerIds);
-    
+
     // Fetch all data in parallel for efficiency
     const [news, injuries, rankings, weather, vegas] = await Promise.all([
       this.getFantasyNews({ players: playerIds, limit: 20 }),
       this.getInjuryReports({ player_ids: playerIds }),
       this.getExpertRankings({ week, limit: 50 }),
       this.getWeatherData({ week }),
-      this.getVegasLines({ week })
+      this.getVegasLines({ week }),
     ]);
 
     // Aggregate data by player
-    const players = playerIds.map(playerId => {
-      const playerNews = news.filter(n => n.player_ids.includes(playerId));
-      const playerInjury = injuries.find(i => i.player_id === playerId);
-      const playerRankings = rankings.filter(r => r.player_id === playerId);
-      
+    const players = playerIds.map((playerId) => {
+      const playerNews = news.filter((n) => n.player_ids.includes(playerId));
+      const playerInjury = injuries.find((i) => i.player_id === playerId);
+      const playerRankings = rankings.filter((r) => r.player_id === playerId);
+
       return {
         player_id: playerId,
         news: playerNews,
         injury_report: playerInjury,
         expert_rankings: playerRankings,
         weather: weather[0], // Simplified - would map by game
-        vegas_context: vegas[0] // Simplified - would map by game
+        vegas_context: vegas[0], // Simplified - would map by game
       };
     });
 
@@ -880,7 +921,7 @@ export class ExternalDataService {
     overall: boolean;
   }> {
     console.log('ExternalDataService health check initiated');
-    
+
     // Stub implementation - Phase 3 will ping actual APIs
     const health = {
       news: true,
@@ -888,7 +929,7 @@ export class ExternalDataService {
       vegas: true,
       rankings: true,
       injuries: true,
-      overall: true
+      overall: true,
     };
 
     console.log('External data service health:', health);
@@ -908,5 +949,5 @@ export class ExternalDataService {
 export const externalDataService = new ExternalDataService({
   cacheEnabled: true,
   cacheTTL: 300, // 5 minutes
-  rubeEnabled: true // Enable Rube MCP integration for live data
+  rubeEnabled: true, // Enable Rube MCP integration for live data
 });

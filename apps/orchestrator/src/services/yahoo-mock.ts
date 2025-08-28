@@ -1,37 +1,37 @@
 // Mock Yahoo service to test server startup without yahoo-fantasy library
-import { prisma } from '../db';
 import { env } from '../config/env';
+import { prisma } from '../db';
 
 // Mock Yahoo client that doesn't import the problematic yahoo-fantasy library
 class MockYahooClient {
-  constructor(clientId: string, clientSecret: string, onRefresh: any, redirectUri: string) {
+  constructor(_clientId: string, _clientSecret: string, _onRefresh: any, _redirectUri: string) {
     console.log('🔧 MockYahooClient created (yahoo-fantasy library bypassed)');
   }
 
-  setUserToken(token: string) {
+  setUserToken(_token: string) {
     console.log('🔧 Mock: setUserToken called');
   }
 
-  setRefreshToken(token: string) {
+  setRefreshToken(_token: string) {
     console.log('🔧 Mock: setRefreshToken called');
   }
 
   game = {
-    meta: async (code: string) => {
+    meta: async (_code: string) => {
       console.log('🔧 Mock: game.meta called');
       return { game_key: '431' };
-    }
+    },
   };
 
   league = {
-    meta: async (leagueKey: string) => {
+    meta: async (_leagueKey: string) => {
       console.log('🔧 Mock: league.meta called');
       return { draft_status: 'postdraft' };
-    }
+    },
   };
 
   user = {
-    game_teams: async (gameKey: string) => {
+    game_teams: async (_gameKey: string) => {
       console.log('🔧 Mock: user.game_teams called');
       return {
         teams: [
@@ -39,15 +39,15 @@ class MockYahooClient {
             team_key: '431.l.123456.t.1',
             team_id: '1',
             league_key: '431.l.123456',
-            name: 'Mock Team'
-          }
-        ]
+            name: 'Mock Team',
+          },
+        ],
       };
-    }
+    },
   };
 
   team = {
-    roster: async (teamKey: string) => {
+    roster: async (_teamKey: string) => {
       console.log('🔧 Mock: team.roster called');
       return {
         roster: [
@@ -57,23 +57,23 @@ class MockYahooClient {
             name: { full: 'Mock Player' },
             eligible_positions: ['QB'],
             selected_position: 'QB',
-            status: 'HEALTHY'
-          }
-        ]
+            status: 'HEALTHY',
+          },
+        ],
       };
     },
-    transactions: (teamKey: string) => ({
-      add: async (data: any) => {
+    transactions: (_teamKey: string) => ({
+      add: async (_data: any) => {
         console.log('🔧 Mock: transactions.add called');
         return {
           transaction: {
             transaction_id: 'mock_trans_123',
             type: 'add_drop',
-            status: 'successful'
-          }
+            status: 'successful',
+          },
         };
-      }
-    })
+      },
+    }),
   };
 }
 
@@ -82,15 +82,15 @@ export async function yfForUser(userId: string) {
   const tok = await prisma.yahooToken.findUnique({ where: { userId } });
   if (!tok) throw new Error('Missing Yahoo token for user');
 
-  const onRefresh = async (tokenData: any) => {
+  const onRefresh = async (_tokenData: any) => {
     console.log('🔧 Mock: onRefresh called');
     // Mock token refresh without actual persistence for testing
   };
 
   const mockClient = new MockYahooClient(
-    env.YAHOO_CLIENT_ID, 
-    env.YAHOO_CLIENT_SECRET, 
-    onRefresh, 
+    env.YAHOO_CLIENT_ID,
+    env.YAHOO_CLIENT_SECRET,
+    onRefresh,
     env.YAHOO_REDIRECT_URI
   );
 
@@ -109,7 +109,11 @@ export function leagueKeyFor(gameKey: string, leagueId: string | number) {
 }
 
 // Find the authenticated user's team in this league
-export async function userTeamKey(yf: any, gameKey: string, leagueKey: string): Promise<string | null> {
+export async function userTeamKey(
+  yf: any,
+  gameKey: string,
+  leagueKey: string
+): Promise<string | null> {
   const user = await yf.user.game_teams(gameKey);
   const teams = user.teams || [];
   const team = teams.find((t: any) => t.team_key && t.league_key === leagueKey);
@@ -130,9 +134,9 @@ export async function stageActions(leagueId: string, actions: any[]) {
 
 export async function callYahoo(action: any) {
   console.log('🔧 Mock: callYahoo called with:', action);
-  
+
   const { leagueKey, teamKey, action: actionData } = action;
-  
+
   if (!leagueKey || !teamKey || !actionData) {
     return { success: false, reason: 'MISSING_REQUIRED_PARAMS' };
   }
@@ -143,15 +147,15 @@ export async function callYahoo(action: any) {
       return {
         success: true,
         transactionId: 'mock_waiver_123',
-        details: { type: 'waiver', mock: true }
+        details: { type: 'waiver', mock: true },
       };
-    
+
     case 'LINEUP_SWAP':
       return {
         success: true,
-        updatedRoster: { mock: true, changes: actionData.playerMoves?.length || 0 }
+        updatedRoster: { mock: true, changes: actionData.playerMoves?.length || 0 },
       };
-    
+
     default:
       return { success: false, reason: 'UNSUPPORTED_ACTION_TYPE' };
   }

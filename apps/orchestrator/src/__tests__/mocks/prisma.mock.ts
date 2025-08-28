@@ -5,28 +5,28 @@ export const mockPrismaClient = {
   yahooToken: {
     findUnique: vi.fn(),
     update: vi.fn(),
-    create: vi.fn()
+    create: vi.fn(),
   },
   recommendation: {
     findMany: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
-    delete: vi.fn()
+    delete: vi.fn(),
   },
   signal: {
     create: vi.fn(),
-    findMany: vi.fn()
+    findMany: vi.fn(),
   },
   user: {
     findUnique: vi.fn(),
-    create: vi.fn()
+    create: vi.fn(),
   },
   league: {
     findUnique: vi.fn(),
-    create: vi.fn()
+    create: vi.fn(),
   },
-  $disconnect: vi.fn()
+  $disconnect: vi.fn(),
 };
 
 // Mock database connection manager
@@ -35,7 +35,7 @@ vi.mock('../../db', () => ({
   connectDatabase: vi.fn().mockResolvedValue(mockPrismaClient),
   disconnectDatabase: vi.fn().mockResolvedValue(undefined),
   getDatabaseHealth: vi.fn().mockResolvedValue({ healthy: true, latency: 50 }),
-  directPrisma: vi.fn().mockReturnValue(mockPrismaClient)
+  directPrisma: vi.fn().mockReturnValue(mockPrismaClient),
 }));
 
 // Sample database records
@@ -45,7 +45,7 @@ export const mockYahooToken = {
   refreshToken: 'mock_refresh_token',
   expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
   tokenType: 'Bearer',
-  scope: 'fspt-w'
+  scope: 'fspt-w',
 };
 
 export const mockRecommendation = {
@@ -59,7 +59,7 @@ export const mockRecommendation = {
     dropPlayerId: 'nfl.p.23456',
     fabBid: 15,
     confidence: 85,
-    reason: 'Injury replacement'
+    reason: 'Injury replacement',
   },
   confidence: 85,
   fabBid: 15,
@@ -67,7 +67,7 @@ export const mockRecommendation = {
   status: 'STAGED',
   createdAt: new Date(),
   executedAt: null,
-  executionResult: null
+  executionResult: null,
 };
 
 // Helper to setup common mock responses

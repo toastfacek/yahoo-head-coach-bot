@@ -2,8 +2,8 @@
 /**
  * Test database connection to diagnose Supabase connectivity issues
  */
-import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
 import pg from 'pg';
 
 // Load environment variables
@@ -38,12 +38,15 @@ async function testConnections() {
     console.error('❌ DATABASE_URL is undefined');
     return;
   }
-  
+
   // Test different connection string variants and modes
-  const directUrl = dbUrl.replace('aws-0-us-east-2.pooler.supabase.com:6543', 'db.awiyuoivkhemdkpoxniz.supabase.co:5432');
+  const directUrl = dbUrl.replace(
+    'aws-0-us-east-2.pooler.supabase.com:6543',
+    'db.awiyuoivkhemdkpoxniz.supabase.co:5432'
+  );
   const sessionUrl = dbUrl + '?pgbouncer=true&connection_limit=1';
-  const transactionUrl = dbUrl.replace('?', '&').replace('6543', '6543?pgbouncer=true');
-  
+  // const transactionUrl = dbUrl.replace('?', '&').replace('6543', '6543?pgbouncer=true');
+
   console.log('\n🔄 Testing Connection Variants:');
   console.log(`   Original (pooler): ${dbUrl.substring(0, 50)}...`);
   console.log(`   Direct: ${directUrl.substring(0, 50)}...`);
@@ -64,10 +67,10 @@ async function testConnections() {
     console.log('⏳ Attempting pooler connection...');
     await client.connect();
     console.log('✅ Pooler connection successful!');
-    
+
     const result = await client.query('SELECT version()');
     console.log('📋 PostgreSQL Version:', result.rows[0]?.version?.substring(0, 50) + '...');
-    
+
     await client.end();
   } catch (error: any) {
     console.error('❌ Pooler connection failed:');
@@ -91,10 +94,10 @@ async function testConnections() {
     console.log('⏳ Attempting direct connection...');
     await client.connect();
     console.log('✅ Direct connection successful!');
-    
+
     const result = await client.query('SELECT version()');
     console.log('📋 PostgreSQL Version:', result.rows[0]?.version?.substring(0, 50) + '...');
-    
+
     await client.end();
   } catch (error: any) {
     console.error('❌ Direct connection failed:');
@@ -112,21 +115,20 @@ async function testConnections() {
     errorFormat: 'pretty',
     datasources: {
       db: {
-        url: dbUrl
-      }
-    }
+        url: dbUrl,
+      },
+    },
   });
 
   try {
     console.log('⏳ Attempting Prisma pooler connection...');
     await prisma.$connect();
     console.log('✅ Prisma pooler connection successful!');
-    
+
     // Test a simple query
     console.log('⏳ Testing simple query...');
     const result = await prisma.$queryRaw`SELECT current_database(), current_user, version()`;
     console.log('📋 Database Info:', result);
-    
   } catch (error: any) {
     console.error('❌ Prisma pooler connection failed:');
     console.error(`   Error: ${error.message}`);
@@ -147,21 +149,20 @@ async function testConnections() {
     errorFormat: 'pretty',
     datasources: {
       db: {
-        url: directUrl
-      }
-    }
+        url: directUrl,
+      },
+    },
   });
 
   try {
     console.log('⏳ Attempting Prisma direct connection...');
     await prisma.$connect();
     console.log('✅ Prisma direct connection successful!');
-    
+
     // Test a simple query
     console.log('⏳ Testing simple query...');
     const result = await prisma.$queryRaw`SELECT current_database(), current_user, version()`;
     console.log('📋 Database Info:', result);
-    
   } catch (error: any) {
     console.error('❌ Prisma direct connection failed:');
     console.error(`   Error: ${error.message}`);

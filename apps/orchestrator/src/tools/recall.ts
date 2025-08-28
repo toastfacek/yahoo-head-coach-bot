@@ -1,5 +1,6 @@
 // Recall tool: fetch recent memory (signals), recommendations, and decisions
 import { z } from 'zod';
+
 import { getRecentSignals, getRecentRecommendations, getRecentDecisions } from './historian';
 
 export const RecallInput = z.object({
@@ -18,9 +19,14 @@ export async function recall(input: z.infer<typeof RecallInput>) {
 
   // Return a trimmed payload to keep tokens low
   return {
-    signals: signals.map(s => ({ id: s.id, kind: s.kind, asOf: s.asOf, source: s.source })),
-    recommendations: recs.map(r => ({ id: r.id, type: r.type, status: r.status, confidence: r.confidence, createdAt: r.createdAt })),
-    decisions: decisions.map(d => ({ id: d.id, action: d.action, executedAt: d.executedAt })),
+    signals: signals.map((s) => ({ id: s.id, kind: s.kind, asOf: s.asOf, source: s.source })),
+    recommendations: recs.map((r) => ({
+      id: r.id,
+      type: r.type,
+      status: r.status,
+      confidence: r.confidence,
+      createdAt: r.createdAt,
+    })),
+    decisions: decisions.map((d) => ({ id: d.id, action: d.action, executedAt: d.executedAt })),
   };
 }
-

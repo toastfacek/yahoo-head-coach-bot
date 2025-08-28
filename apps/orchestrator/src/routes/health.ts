@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+
 import { env } from '../config/env';
 
 export async function healthCheck(req: Request, res: Response) {
@@ -10,7 +11,7 @@ export async function healthCheck(req: Request, res: Response) {
     uptime: process.uptime(),
     environment: env.NODE_ENV || 'development',
     model: env.AI_MODEL,
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env.npm_package_version || '1.0.0',
   };
 
   res.status(200).json(healthStatus);

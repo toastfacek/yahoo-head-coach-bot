@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import { 
-  mockPrismaClient, 
-  setupPrismaMocks, 
-  resetPrismaMocks
+import {
+  mockPrismaClient,
+  setupPrismaMocks,
+  resetPrismaMocks,
 } from '../../__tests__/mocks/prisma.mock';
-import { 
-  mockYahooClient, 
-  setupYahooMocks, 
-  resetYahooMocks 
+import {
+  mockYahooClient,
+  setupYahooMocks,
+  resetYahooMocks,
 } from '../../__tests__/mocks/yahoo-api.mock';
 
 // Mock the Yahoo service
@@ -17,25 +17,25 @@ vi.mock('../../services/yahoo', () => ({
   leagueKeyFor: vi.fn().mockReturnValue('431.l.123456'),
   userTeamKey: vi.fn().mockResolvedValue('431.l.123456.t.1'),
   isLeaguePostDraft: vi.fn().mockResolvedValue(true),
-  callYahoo: vi.fn().mockResolvedValue({ success: true, transactionId: 'trans_123' })
+  callYahoo: vi.fn().mockResolvedValue({ success: true, transactionId: 'trans_123' }),
 }));
 
 // Mock the policy and environment
 vi.mock('../../config/policy', () => ({
   POLICY: {
-    confidence: { execute: 0.80, stageMin: 0.60 },
-    fab: { autoExecuteBudgetPct: 0.03 }
-  }
+    confidence: { execute: 0.8, stageMin: 0.6 },
+    fab: { autoExecuteBudgetPct: 0.03 },
+  },
 }));
 
 vi.mock('../../config/env', () => ({
   env: {
-    EXECUTION_MODE: 'dry-run'
-  }
+    EXECUTION_MODE: 'dry-run',
+  },
 }));
 
 vi.mock('../../guards/shouldExecute', () => ({
-  shouldAutoExecute: vi.fn()
+  shouldAutoExecute: vi.fn(),
 }));
 
 describe('Executor Tool', () => {
@@ -59,12 +59,12 @@ describe('Executor Tool', () => {
     const baseInput = {
       leagueId: '123456',
       userId: 'test-user-1',
-      actions: []
+      actions: [],
     };
 
     it('skips actions below staging confidence threshold', async () => {
       const { proposeOrExecute } = await import('../executor');
-      
+
       const input = {
         ...baseInput,
         actions: [
@@ -73,9 +73,9 @@ describe('Executor Tool', () => {
             type: 'WAIVER',
             summary: 'Low confidence waiver',
             confidence: 0.55, // Below 0.60 stageMin
-            fabBid: 10
-          }
-        ]
+            fabBid: 10,
+          },
+        ],
       };
 
       const result = await proposeOrExecute(input);
@@ -89,14 +89,14 @@ describe('Executor Tool', () => {
     it('stages actions above confidence threshold', async () => {
       const mockShouldAutoExecute = vi.fn().mockReturnValue(false);
       vi.doMock('../../guards/shouldExecute', () => ({
-        shouldAutoExecute: mockShouldAutoExecute
+        shouldAutoExecute: mockShouldAutoExecute,
       }));
 
       // Mock staging execution mode so it stages instead of dry-run
       vi.doMock('../../config/env', () => ({
         env: {
-          EXECUTION_MODE: 'staging'
-        }
+          EXECUTION_MODE: 'staging',
+        },
       }));
 
       // Re-import after mocking
@@ -105,7 +105,7 @@ describe('Executor Tool', () => {
 
       mockPrismaClient.recommendation.create.mockResolvedValue({
         id: 'rec_123',
-        status: 'STAGED'
+        status: 'STAGED',
       });
 
       const input = {
@@ -115,11 +115,11 @@ describe('Executor Tool', () => {
             id: 'action1',
             type: 'WAIVER',
             summary: 'Medium confidence waiver',
-            confidence: 0.70,
+            confidence: 0.7,
             fabBid: 15,
-            fabRemaining: 100
-          }
-        ]
+            fabRemaining: 100,
+          },
+        ],
       };
 
       const result = await proposeOrExecute(input);
@@ -130,11 +130,11 @@ describe('Executor Tool', () => {
           type: 'WAIVER',
           summary: 'Medium confidence waiver',
           payload: input.actions[0],
-          confidence: 0.70,
+          confidence: 0.7,
           fabBid: 15,
           autoEligible: false,
-          status: 'STAGED'
-        }
+          status: 'STAGED',
+        },
       });
 
       expect(result.results[0].status).toBe('STAGED');
@@ -143,7 +143,7 @@ describe('Executor Tool', () => {
     it('correctly determines auto-eligible status', async () => {
       const mockShouldAutoExecute = vi.fn().mockReturnValue(true);
       vi.doMock('../../guards/shouldExecute', () => ({
-        shouldAutoExecute: mockShouldAutoExecute
+        shouldAutoExecute: mockShouldAutoExecute,
       }));
 
       vi.resetModules();
@@ -157,9 +157,9 @@ describe('Executor Tool', () => {
             summary: 'Injury replacement',
             confidence: 0.85,
             reason: 'INJURY_OUT',
-            isInjuryOut: true
-          }
-        ]
+            isInjuryOut: true,
+          },
+        ],
       };
 
       const { proposeOrExecute } = await import('../executor');
@@ -170,14 +170,14 @@ describe('Executor Tool', () => {
         confidence: 0.85,
         isInjuryOut: true,
         fabBid: null,
-        fabRemaining: null
+        fabRemaining: null,
       });
 
       expect(mockPrismaClient.recommendation.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            autoEligible: true
-          })
+            autoEligible: true,
+          }),
         })
       );
     });
@@ -186,28 +186,30 @@ describe('Executor Tool', () => {
       // Mock live execution mode
       vi.doMock('../../config/env', () => ({
         env: {
-          EXECUTION_MODE: 'live'
-        }
+          EXECUTION_MODE: 'live',
+        },
       }));
 
       const mockShouldAutoExecute = vi.fn().mockReturnValue(true);
       vi.doMock('../../guards/shouldExecute', () => ({
-        shouldAutoExecute: mockShouldAutoExecute
+        shouldAutoExecute: mockShouldAutoExecute,
       }));
 
-      const mockCallYahoo = vi.fn().mockResolvedValue({ success: true, transactionId: 'trans_123' });
+      const mockCallYahoo = vi
+        .fn()
+        .mockResolvedValue({ success: true, transactionId: 'trans_123' });
       vi.doMock('../../services/yahoo', () => ({
         yfForUser: vi.fn().mockResolvedValue(mockYahooClient),
         getGameKey: vi.fn().mockResolvedValue('431'),
         leagueKeyFor: vi.fn().mockReturnValue('431.l.123456'),
         userTeamKey: vi.fn().mockResolvedValue('431.l.123456.t.1'),
         isLeaguePostDraft: vi.fn().mockResolvedValue(true),
-        callYahoo: mockCallYahoo
+        callYahoo: mockCallYahoo,
       }));
 
       mockPrismaClient.recommendation.create.mockResolvedValue({
         id: 'rec_123',
-        status: 'STAGED'
+        status: 'STAGED',
       });
 
       const input = {
@@ -218,32 +220,32 @@ describe('Executor Tool', () => {
             type: 'LINEUP_SWAP',
             summary: 'Auto-executable swap',
             confidence: 0.85,
-            isInjuryOut: true
-          }
-        ]
+            isInjuryOut: true,
+          },
+        ],
       };
 
       // Need to reload the module to get the updated env mock
       vi.resetModules();
       const { proposeOrExecute: reloadedExecutor } = await import('../executor');
-      
+
       const result = await reloadedExecutor(input);
 
       expect(result.results[0].status).toBe('EXECUTED');
       expect(mockPrismaClient.recommendation.update).toHaveBeenCalledWith({
         where: { id: 'rec_123' },
-        data: { status: 'EXECUTED' }
+        data: { status: 'EXECUTED' },
       });
     });
 
     it('blocks execution when league is pre-draft', async () => {
       vi.doMock('../../config/env', () => ({
-        env: { EXECUTION_MODE: 'live' }
+        env: { EXECUTION_MODE: 'live' },
       }));
 
       const mockShouldAutoExecute = vi.fn().mockReturnValue(true);
       vi.doMock('../../guards/shouldExecute', () => ({
-        shouldAutoExecute: mockShouldAutoExecute
+        shouldAutoExecute: mockShouldAutoExecute,
       }));
 
       const mockIsLeaguePostDraft = vi.fn().mockResolvedValue(false);
@@ -253,12 +255,12 @@ describe('Executor Tool', () => {
         leagueKeyFor: vi.fn().mockReturnValue('431.l.123456'),
         userTeamKey: vi.fn().mockResolvedValue('431.l.123456.t.1'),
         isLeaguePostDraft: mockIsLeaguePostDraft,
-        callYahoo: vi.fn().mockResolvedValue({ success: true, transactionId: 'trans_123' })
+        callYahoo: vi.fn().mockResolvedValue({ success: true, transactionId: 'trans_123' }),
       }));
 
       mockPrismaClient.recommendation.create.mockResolvedValue({
         id: 'rec_123',
-        status: 'STAGED'
+        status: 'STAGED',
       });
 
       const input = {
@@ -270,14 +272,14 @@ describe('Executor Tool', () => {
             summary: 'Pre-draft blocked action',
             confidence: 0.85,
             fabBid: 10,
-            fabRemaining: 100
-          }
-        ]
+            fabRemaining: 100,
+          },
+        ],
       };
 
       vi.resetModules();
       const { proposeOrExecute: reloadedExecutor } = await import('../executor');
-      
+
       const result = await reloadedExecutor(input);
 
       expect(result.results[0].status).toBe('STAGED');
@@ -286,12 +288,12 @@ describe('Executor Tool', () => {
 
     it('handles missing team key gracefully', async () => {
       vi.doMock('../../config/env', () => ({
-        env: { EXECUTION_MODE: 'live' }
+        env: { EXECUTION_MODE: 'live' },
       }));
 
       const mockShouldAutoExecute = vi.fn().mockReturnValue(true);
       vi.doMock('../../guards/shouldExecute', () => ({
-        shouldAutoExecute: mockShouldAutoExecute
+        shouldAutoExecute: mockShouldAutoExecute,
       }));
 
       const mockUserTeamKey = vi.fn().mockResolvedValue(null);
@@ -301,7 +303,7 @@ describe('Executor Tool', () => {
         leagueKeyFor: vi.fn().mockReturnValue('431.l.123456'),
         userTeamKey: mockUserTeamKey,
         isLeaguePostDraft: vi.fn().mockResolvedValue(true),
-        callYahoo: vi.fn().mockResolvedValue({ success: true, transactionId: 'trans_123' })
+        callYahoo: vi.fn().mockResolvedValue({ success: true, transactionId: 'trans_123' }),
       }));
 
       const input = {
@@ -313,14 +315,14 @@ describe('Executor Tool', () => {
             summary: 'No team key action',
             confidence: 0.85,
             fabBid: 10,
-            fabRemaining: 100
-          }
-        ]
+            fabRemaining: 100,
+          },
+        ],
       };
 
       vi.resetModules();
       const { proposeOrExecute: reloadedExecutor } = await import('../executor');
-      
+
       const result = await reloadedExecutor(input);
 
       expect(result.results[0].status).toBe('STAGED');
@@ -329,17 +331,17 @@ describe('Executor Tool', () => {
 
     it('handles Yahoo API execution failures', async () => {
       vi.doMock('../../config/env', () => ({
-        env: { EXECUTION_MODE: 'live' }
+        env: { EXECUTION_MODE: 'live' },
       }));
 
       const mockShouldAutoExecute = vi.fn().mockReturnValue(true);
       vi.doMock('../../guards/shouldExecute', () => ({
-        shouldAutoExecute: mockShouldAutoExecute
+        shouldAutoExecute: mockShouldAutoExecute,
       }));
 
-      const mockCallYahoo = vi.fn().mockResolvedValue({ 
-        success: false, 
-        reason: 'TRANSACTION_FAILED' 
+      const mockCallYahoo = vi.fn().mockResolvedValue({
+        success: false,
+        reason: 'TRANSACTION_FAILED',
       });
       vi.doMock('../../services/yahoo', () => ({
         yfForUser: vi.fn().mockResolvedValue(mockYahooClient),
@@ -347,7 +349,7 @@ describe('Executor Tool', () => {
         leagueKeyFor: vi.fn().mockReturnValue('431.l.123456'),
         userTeamKey: vi.fn().mockResolvedValue('431.l.123456.t.1'),
         isLeaguePostDraft: vi.fn().mockResolvedValue(true),
-        callYahoo: mockCallYahoo
+        callYahoo: mockCallYahoo,
       }));
 
       const input = {
@@ -359,14 +361,14 @@ describe('Executor Tool', () => {
             summary: 'Failed execution',
             confidence: 0.85,
             fabBid: 10,
-            fabRemaining: 100
-          }
-        ]
+            fabRemaining: 100,
+          },
+        ],
       };
 
       vi.resetModules();
       const { proposeOrExecute: reloadedExecutor } = await import('../executor');
-      
+
       const result = await reloadedExecutor(input);
 
       expect(result.results[0].status).toBe('STAGED');
@@ -376,14 +378,14 @@ describe('Executor Tool', () => {
     it('marks actions as DRY_RUN in dry-run mode', async () => {
       const mockShouldAutoExecute = vi.fn().mockReturnValue(true);
       vi.doMock('../../guards/shouldExecute', () => ({
-        shouldAutoExecute: mockShouldAutoExecute
+        shouldAutoExecute: mockShouldAutoExecute,
       }));
 
       // Mock env to stay in dry-run mode (default)
       vi.doMock('../../config/env', () => ({
         env: {
-          EXECUTION_MODE: 'dry-run'
-        }
+          EXECUTION_MODE: 'dry-run',
+        },
       }));
 
       vi.resetModules();
@@ -398,9 +400,9 @@ describe('Executor Tool', () => {
             summary: 'Dry run action',
             confidence: 0.85,
             fabBid: 10,
-            fabRemaining: 100
-          }
-        ]
+            fabRemaining: 100,
+          },
+        ],
       };
 
       const result = await proposeOrExecute(input);
@@ -410,11 +412,12 @@ describe('Executor Tool', () => {
     });
 
     it('processes multiple actions correctly', async () => {
-      const mockShouldAutoExecute = vi.fn()
+      const mockShouldAutoExecute = vi
+        .fn()
         .mockReturnValueOnce(false) // First action not auto-eligible
-        .mockReturnValueOnce(true);  // Second action auto-eligible
+        .mockReturnValueOnce(true); // Second action auto-eligible
       vi.doMock('../../guards/shouldExecute', () => ({
-        shouldAutoExecute: mockShouldAutoExecute
+        shouldAutoExecute: mockShouldAutoExecute,
       }));
 
       vi.resetModules();
@@ -433,16 +436,16 @@ describe('Executor Tool', () => {
             summary: 'Manual approval needed',
             confidence: 0.65,
             fabBid: 20,
-            fabRemaining: 100
+            fabRemaining: 100,
           },
           {
             id: 'action2',
             type: 'LINEUP_SWAP',
             summary: 'Auto-executable swap',
             confidence: 0.85,
-            isInjuryOut: true
-          }
-        ]
+            isInjuryOut: true,
+          },
+        ],
       };
 
       const result = await proposeOrExecute(input);
@@ -455,12 +458,12 @@ describe('Executor Tool', () => {
 
     it('handles execution errors gracefully', async () => {
       vi.doMock('../../config/env', () => ({
-        env: { EXECUTION_MODE: 'live' }
+        env: { EXECUTION_MODE: 'live' },
       }));
 
       const mockShouldAutoExecute = vi.fn().mockReturnValue(true);
       vi.doMock('../../guards/shouldExecute', () => ({
-        shouldAutoExecute: mockShouldAutoExecute
+        shouldAutoExecute: mockShouldAutoExecute,
       }));
 
       const mockCallYahoo = vi.fn().mockRejectedValue(new Error('Network error'));
@@ -470,7 +473,7 @@ describe('Executor Tool', () => {
         leagueKeyFor: vi.fn().mockReturnValue('431.l.123456'),
         userTeamKey: vi.fn().mockResolvedValue('431.l.123456.t.1'),
         isLeaguePostDraft: vi.fn().mockResolvedValue(true),
-        callYahoo: mockCallYahoo
+        callYahoo: mockCallYahoo,
       }));
 
       const input = {
@@ -482,14 +485,14 @@ describe('Executor Tool', () => {
             summary: 'Network error action',
             confidence: 0.85,
             fabBid: 10,
-            fabRemaining: 100
-          }
-        ]
+            fabRemaining: 100,
+          },
+        ],
       };
 
       vi.resetModules();
       const { proposeOrExecute: reloadedExecutor } = await import('../executor');
-      
+
       const result = await reloadedExecutor(input);
 
       expect(result.results[0].status).toBe('STAGED');

@@ -4,11 +4,18 @@
 // - Stage recommendation in DB
 // - If EXECUTION_MODE=live and autoEligible -> attempt execution (post-draft only)
 // - If EXECUTION_MODE=dry-run -> mark as DRY_RUN
+import { env } from '../config/env';
+import { POLICY } from '../config/policy';
 import { prisma } from '../db';
 import { shouldAutoExecute } from '../guards/shouldExecute';
-import { POLICY } from '../config/policy';
-import { env } from '../config/env';
-import { yfForUser, getGameKey, leagueKeyFor, userTeamKey, isLeaguePostDraft, callYahoo } from '../services/yahoo';
+import {
+  yfForUser,
+  getGameKey,
+  leagueKeyFor,
+  userTeamKey,
+  isLeaguePostDraft,
+  callYahoo,
+} from '../services/yahoo';
 
 type Action = {
   id?: string;
@@ -21,8 +28,14 @@ type Action = {
   [k: string]: any;
 };
 
-export async function proposeOrExecute({ leagueId, userId, actions }:{
-  leagueId: string; userId: string; actions: Action[];
+export async function proposeOrExecute({
+  leagueId,
+  userId,
+  actions,
+}: {
+  leagueId: string;
+  userId: string;
+  actions: Action[];
 }) {
   const results: any[] = [];
 
@@ -37,8 +50,8 @@ export async function proposeOrExecute({ leagueId, userId, actions }:{
       type: (a.type as any) === 'WAIVER' ? 'WAIVER' : 'LINEUP_SWAP',
       confidence: a.confidence,
       isInjuryOut: a.reason === 'INJURY_OUT' || a.isInjuryOut === true,
-      fabBid: a.fabBid ?? null as any,
-      fabRemaining: a.fabRemaining ?? null as any,
+      fabBid: a.fabBid ?? (null as any),
+      fabRemaining: a.fabRemaining ?? (null as any),
     });
 
     // Stage recommendation (MVP). Execution via Yahoo will be added later.
@@ -76,14 +89,27 @@ export async function proposeOrExecute({ leagueId, userId, actions }:{
         // Execute the action via Yahoo API
         const execRes = await callYahoo({ leagueKey, teamKey, action: a, yf });
         if (execRes?.success) {
-          await prisma.recommendation.update({ where: { id: rec.id }, data: { status: 'EXECUTED' } });
+          await prisma.recommendation.update({
+            where: { id: rec.id },
+            data: { status: 'EXECUTED' },
+          });
           results.push({ id: rec.id, status: 'EXECUTED', autoEligible });
         } else {
-          results.push({ id: rec.id, status: 'STAGED', autoEligible, note: execRes?.reason || 'not_implemented' });
+          results.push({
+            id: rec.id,
+            status: 'STAGED',
+            autoEligible,
+            note: execRes?.reason || 'not_implemented',
+          });
         }
       } catch (err: any) {
         console.error('Executor live execution error:', err);
-        results.push({ id: rec.id, status: 'STAGED', autoEligible, error: err?.message || 'execution_error' });
+        results.push({
+          id: rec.id,
+          status: 'STAGED',
+          autoEligible,
+          error: err?.message || 'execution_error',
+        });
       }
     } else if (env.EXECUTION_MODE === 'dry-run') {
       results.push({ id: rec.id, status: 'DRY_RUN', autoEligible });

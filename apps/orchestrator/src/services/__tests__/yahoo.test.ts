@@ -1,26 +1,26 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import { 
-  yfForUser, 
-  getGameKey, 
-  leagueKeyFor, 
-  userTeamKey, 
+import {
+  yfForUser,
+  getGameKey,
+  leagueKeyFor,
+  userTeamKey,
   isLeaguePostDraft,
-  callYahoo
+  callYahoo,
 } from '../yahoo';
-import { 
-  mockYahooClient, 
-  setupYahooMocks, 
+import {
+  mockYahooClient,
+  setupYahooMocks,
   resetYahooMocks,
   mockGameData,
   mockLeagueData,
   mockUserTeams,
-  mockTransactionResponse
+  mockTransactionResponse,
 } from '../../__tests__/mocks/yahoo-api.mock';
-import { 
-  mockPrismaClient, 
-  setupPrismaMocks, 
+import {
+  mockPrismaClient,
+  setupPrismaMocks,
   resetPrismaMocks,
-  mockYahooToken
+  mockYahooToken,
 } from '../../__tests__/mocks/prisma.mock';
 
 describe('Yahoo Service Integration', () => {
@@ -43,11 +43,11 @@ describe('Yahoo Service Integration', () => {
   describe('yfForUser', () => {
     it('creates Yahoo client with stored tokens', async () => {
       const client = await yfForUser('test-user-1');
-      
+
       expect(mockPrismaClient.yahooToken.findUnique).toHaveBeenCalledWith({
-        where: { userId: 'test-user-1' }
+        where: { userId: 'test-user-1' },
       });
-      
+
       // These methods exist for test compatibility but don't need to be tested
       // since the actual token setting happens during client creation
       expect(client).toBeDefined();
@@ -57,23 +57,21 @@ describe('Yahoo Service Integration', () => {
 
     it('throws error when no Yahoo token found', async () => {
       mockPrismaClient.yahooToken.findUnique.mockResolvedValue(null);
-      
-      await expect(yfForUser('nonexistent-user')).rejects.toThrow(
-        'Missing Yahoo token for user'
-      );
+
+      await expect(yfForUser('nonexistent-user')).rejects.toThrow('Missing Yahoo token for user');
     });
 
     it('handles token refresh callback', async () => {
       const client = await yfForUser('test-user-1');
-      
+
       // Since the implementation doesn't expose token refresh callbacks in the compatibility layer,
       // we can verify that the client was created successfully instead
       expect(client).toBeDefined();
       expect(typeof client.setUserToken).toBe('function');
       expect(typeof client.setRefreshToken).toBe('function');
-      
+
       expect(mockPrismaClient.yahooToken.findUnique).toHaveBeenCalledWith({
-        where: { userId: 'test-user-1' }
+        where: { userId: 'test-user-1' },
       });
     });
   });
@@ -85,13 +83,13 @@ describe('Yahoo Service Integration', () => {
         success: true,
         data: {
           fantasy_content: {
-            game: [{ game_key: '431' }]
-          }
-        }
+            game: [{ game_key: '431' }],
+          },
+        },
       });
-      
+
       const gameKey = await getGameKey(mockYahooClient, 'nfl');
-      
+
       expect(mockYahooClient.getGameMeta).toHaveBeenCalledWith('nfl');
       expect(gameKey).toBe('431');
     });
@@ -102,13 +100,13 @@ describe('Yahoo Service Integration', () => {
         success: true,
         data: {
           fantasy_content: {
-            game: [{ game_key: '431' }]
-          }
-        }
+            game: [{ game_key: '431' }],
+          },
+        },
       });
-      
+
       const gameKey = await getGameKey(mockYahooClient);
-      
+
       expect(mockYahooClient.getGameMeta).toHaveBeenCalledWith('nfl');
       expect(gameKey).toBe('431');
     });
@@ -135,36 +133,35 @@ describe('Yahoo Service Integration', () => {
           fantasy_content: {
             league: [
               null, // league[0] is league info
-              {     // league[1] is teams
+              {
+                // league[1] is teams
                 teams: {
                   0: {
-                    team: [
-                      [{ team_key: '431.l.123456.t.1', is_owned_by_current_login: 1 }]
-                    ]
-                  }
-                }
-              }
-            ]
-          }
-        }
+                    team: [[{ team_key: '431.l.123456.t.1', is_owned_by_current_login: 1 }]],
+                  },
+                },
+              },
+            ],
+          },
+        },
       });
-      
+
       const teamKey = await userTeamKey(mockYahooClient, '431', '431.l.123456');
-      
+
       expect(mockYahooClient.getLeagueTeams).toHaveBeenCalledWith('431.l.123456');
       expect(teamKey).toBe('431.l.123456.t.1');
     });
 
     it('returns null when user not in league', async () => {
       mockYahooClient.user.game_teams.mockResolvedValue({ teams: [] });
-      
+
       const teamKey = await userTeamKey(mockYahooClient, '431', '431.l.999999');
       expect(teamKey).toBeNull();
     });
 
     it('handles missing teams data', async () => {
       mockYahooClient.user.game_teams.mockResolvedValue({});
-      
+
       const teamKey = await userTeamKey(mockYahooClient, '431', '431.l.123456');
       expect(teamKey).toBeNull();
     });
@@ -177,13 +174,13 @@ describe('Yahoo Service Integration', () => {
         success: true,
         data: {
           fantasy_content: {
-            league: [{ draft_status: 'postdraft' }]
-          }
-        }
+            league: [{ draft_status: 'postdraft' }],
+          },
+        },
       });
-      
+
       const isPostDraft = await isLeaguePostDraft(mockYahooClient, '431.l.123456');
-      
+
       expect(mockYahooClient.getLeagueMeta).toHaveBeenCalledWith('431.l.123456');
       expect(isPostDraft).toBe(true);
     });
@@ -193,11 +190,11 @@ describe('Yahoo Service Integration', () => {
         success: true,
         data: {
           fantasy_content: {
-            league: [{ draft_status: 'predraft' }]
-          }
-        }
+            league: [{ draft_status: 'predraft' }],
+          },
+        },
       });
-      
+
       const isPostDraft = await isLeaguePostDraft(mockYahooClient, '431.l.123456');
       expect(isPostDraft).toBe(false);
     });
@@ -207,11 +204,11 @@ describe('Yahoo Service Integration', () => {
         success: true,
         data: {
           fantasy_content: {
-            league: [{ draft_status: 'postdraft' }]
-          }
-        }
+            league: [{ draft_status: 'postdraft' }],
+          },
+        },
       });
-      
+
       const isPostDraft = await isLeaguePostDraft(mockYahooClient, '431.l.123456');
       expect(isPostDraft).toBe(true);
     });
@@ -226,22 +223,22 @@ describe('Yahoo Service Integration', () => {
         type: 'WAIVER',
         addPlayerId: 'nfl.p.12345',
         dropPlayerId: 'nfl.p.23456',
-        fabBid: 15
-      }
+        fabBid: 15,
+      },
     };
 
     it('executes successful add/drop waiver claim', async () => {
       const result = await callYahoo(mockAction);
-      
+
       expect(result.success).toBe(true);
       expect(result.transactionId).toBe('trans_123');
       expect(mockYahooClient.team.transactions().add).toHaveBeenCalledWith({
         type: 'add_drop',
         players: [
           { player_key: 'nfl.p.12345', transaction_type: 'add' },
-          { player_key: 'nfl.p.23456', transaction_type: 'drop' }
+          { player_key: 'nfl.p.23456', transaction_type: 'drop' },
         ],
-        faab_bid: 15
+        faab_bid: 15,
       });
     });
 
@@ -251,18 +248,16 @@ describe('Yahoo Service Integration', () => {
         action: {
           type: 'WAIVER',
           addPlayerId: 'nfl.p.12345',
-          fabBid: 10
-        }
+          fabBid: 10,
+        },
       };
 
       await callYahoo(addOnlyAction);
-      
+
       expect(mockYahooClient.team.transactions().add).toHaveBeenCalledWith({
         type: 'add',
-        players: [
-          { player_key: 'nfl.p.12345', transaction_type: 'add' }
-        ],
-        faab_bid: 10
+        players: [{ player_key: 'nfl.p.12345', transaction_type: 'add' }],
+        faab_bid: 10,
       });
     });
 
@@ -272,17 +267,15 @@ describe('Yahoo Service Integration', () => {
         action: {
           type: 'WAIVER',
           addPlayerId: 'nfl.p.12345',
-          fabBid: 0
-        }
+          fabBid: 0,
+        },
       };
 
       await callYahoo(zeroBidAction);
-      
+
       expect(mockYahooClient.team.transactions().add).toHaveBeenCalledWith({
         type: 'add',
-        players: [
-          { player_key: 'nfl.p.12345', transaction_type: 'add' }
-        ]
+        players: [{ player_key: 'nfl.p.12345', transaction_type: 'add' }],
         // No faab_bid field when 0
       });
     });
@@ -292,33 +285,31 @@ describe('Yahoo Service Integration', () => {
         ...mockAction,
         action: {
           type: 'WAIVER',
-          fabBid: 15
+          fabBid: 15,
           // missing addPlayerId
-        }
+        },
       };
 
       const result = await callYahoo(invalidAction);
-      
+
       expect(result.success).toBe(false);
       expect(result.reason).toBe('MISSING_ADD_PLAYER_ID');
     });
 
     it('handles Yahoo API transaction failure', async () => {
       mockYahooClient.team.transactions().add.mockResolvedValue({});
-      
+
       const result = await callYahoo(mockAction);
-      
+
       expect(result.success).toBe(false);
       expect(result.reason).toBe('TRANSACTION_FAILED');
     });
 
     it('handles Yahoo API errors', async () => {
-      mockYahooClient.team.transactions().add.mockRejectedValue(
-        new Error('Yahoo API Error')
-      );
-      
+      mockYahooClient.team.transactions().add.mockRejectedValue(new Error('Yahoo API Error'));
+
       const result = await callYahoo(mockAction);
-      
+
       expect(result.success).toBe(false);
       expect(result.reason).toBe('WAIVER_EXECUTION_ERROR');
       expect(result.error).toBe('Yahoo API Error');
@@ -334,27 +325,27 @@ describe('Yahoo Service Integration', () => {
         type: 'LINEUP_SWAP',
         playerMoves: [
           { playerId: 'nfl.p.12345', newPosition: 'QB' },
-          { playerId: 'nfl.p.23456', newPosition: 'BN' }
-        ]
-      }
+          { playerId: 'nfl.p.23456', newPosition: 'BN' },
+        ],
+      },
     };
 
     beforeEach(() => {
       mockYahooClient.team.roster.mockReturnValue({
-        edit: vi.fn().mockResolvedValue({ roster: 'updated_roster' })
+        edit: vi.fn().mockResolvedValue({ roster: 'updated_roster' }),
       });
     });
 
     it('executes successful lineup changes', async () => {
       const result = await callYahoo(mockLineupAction);
-      
+
       expect(result.success).toBe(true);
       expect(result.updatedRoster).toBe('updated_roster');
       expect(mockYahooClient.team.roster().edit).toHaveBeenCalledWith({
         roster_moves: [
           { player_key: 'nfl.p.12345', position: 'QB' },
-          { player_key: 'nfl.p.23456', position: 'BN' }
-        ]
+          { player_key: 'nfl.p.23456', position: 'BN' },
+        ],
       });
     });
 
@@ -362,13 +353,13 @@ describe('Yahoo Service Integration', () => {
       const invalidAction = {
         ...mockLineupAction,
         action: {
-          type: 'LINEUP_SWAP'
+          type: 'LINEUP_SWAP',
           // missing playerMoves
-        }
+        },
       };
 
       const result = await callYahoo(invalidAction);
-      
+
       expect(result.success).toBe(false);
       expect(result.reason).toBe('MISSING_PLAYER_MOVES');
     });
@@ -378,21 +369,21 @@ describe('Yahoo Service Integration', () => {
         ...mockLineupAction,
         action: {
           type: 'LINEUP_SWAP',
-          playerMoves: []
-        }
+          playerMoves: [],
+        },
       };
 
       const result = await callYahoo(emptyMovesAction);
-      
+
       expect(result.success).toBe(false);
       expect(result.reason).toBe('MISSING_PLAYER_MOVES');
     });
 
     it('handles Yahoo API roster update failure', async () => {
       mockYahooClient.team.roster().edit.mockResolvedValue({});
-      
+
       const result = await callYahoo(mockLineupAction);
-      
+
       expect(result.success).toBe(false);
       expect(result.reason).toBe('LINEUP_UPDATE_FAILED');
     });
@@ -401,7 +392,7 @@ describe('Yahoo Service Integration', () => {
   describe('callYahoo - Error Handling', () => {
     it('returns error when required params missing', async () => {
       const result = await callYahoo({});
-      
+
       expect(result.success).toBe(false);
       expect(result.reason).toBe('MISSING_REQUIRED_PARAMS');
     });
@@ -410,9 +401,9 @@ describe('Yahoo Service Integration', () => {
       const result = await callYahoo({
         leagueKey: '431.l.123456',
         teamKey: '431.l.123456.t.1',
-        action: { type: 'WAIVER' }
+        action: { type: 'WAIVER' },
       });
-      
+
       expect(result.success).toBe(false);
       expect(result.reason).toBe('MISSING_YAHOO_CLIENT');
     });
@@ -422,9 +413,9 @@ describe('Yahoo Service Integration', () => {
         leagueKey: '431.l.123456',
         teamKey: '431.l.123456.t.1',
         yf: mockYahooClient,
-        action: { type: 'UNSUPPORTED_TYPE' }
+        action: { type: 'UNSUPPORTED_TYPE' },
       });
-      
+
       expect(result.success).toBe(false);
       expect(result.reason).toBe('UNSUPPORTED_ACTION_TYPE');
     });

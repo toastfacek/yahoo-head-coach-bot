@@ -9,23 +9,23 @@ import * as yahooService from '../../services/yahoo';
 function createTestApp() {
   const app = express();
   app.use(express.json());
-  
+
   app.get('/approvals/pending', listPending);
   app.post('/approvals/approve', approve);
   app.post('/approvals/reject', reject);
-  
+
   return app;
 }
 
-// Mock the database  
+// Mock the database
 vi.mock('../../db', () => ({
   prisma: {
     recommendation: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
-      update: vi.fn()
-    }
-  }
+      update: vi.fn(),
+    },
+  },
 }));
 
 // Mock the Yahoo service
@@ -34,7 +34,7 @@ vi.mock('../../services/yahoo', () => ({
   getGameKey: vi.fn().mockResolvedValue('431'),
   leagueKeyFor: vi.fn().mockReturnValue('431.l.123456'),
   userTeamKey: vi.fn().mockResolvedValue('431.l.123456.t.1'),
-  callYahoo: vi.fn()
+  callYahoo: vi.fn(),
 }));
 
 describe('Approvals API Routes', () => {
@@ -63,47 +63,42 @@ describe('Approvals API Routes', () => {
           summary: 'Add RB Handcuff',
           status: 'STAGED',
           confidence: 85,
-          createdAt: new Date()
+          createdAt: new Date(),
         },
         {
-          id: 'rec_2', 
+          id: 'rec_2',
           leagueId: '123456',
           type: 'LINEUP_SWAP',
           summary: 'Bench injured player',
           status: 'STAGED',
           confidence: 90,
-          createdAt: new Date()
-        }
+          createdAt: new Date(),
+        },
       ];
 
       vi.mocked(prisma.recommendation.findMany).mockResolvedValue(mockRecommendations);
 
-      const response = await request(app)
-        .get('/approvals/pending')
-        .query({ leagueId: '123456' });
+      const response = await request(app).get('/approvals/pending').query({ leagueId: '123456' });
 
       expect(response.status).toBe(200);
       expect(response.body.pending).toHaveLength(2);
       expect(response.body.pending[0].id).toBe('rec_1');
-      
+
       expect(vi.mocked(prisma.recommendation.findMany)).toHaveBeenCalledWith({
         where: { leagueId: '123456', status: 'STAGED' },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
     });
 
     it('returns 400 for missing league ID', async () => {
-      const response = await request(app)
-        .get('/approvals/pending');
+      const response = await request(app).get('/approvals/pending');
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Invalid query');
     });
 
     it('returns 400 for empty league ID', async () => {
-      const response = await request(app)
-        .get('/approvals/pending')
-        .query({ leagueId: '' });
+      const response = await request(app).get('/approvals/pending').query({ leagueId: '' });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Invalid query');
@@ -112,9 +107,7 @@ describe('Approvals API Routes', () => {
     it('returns empty array when no pending recommendations', async () => {
       vi.mocked(prisma.recommendation.findMany).mockResolvedValue([]);
 
-      const response = await request(app)
-        .get('/approvals/pending')
-        .query({ leagueId: '123456' });
+      const response = await request(app).get('/approvals/pending').query({ leagueId: '123456' });
 
       expect(response.status).toBe(200);
       expect(response.body.pending).toHaveLength(0);
@@ -131,15 +124,15 @@ describe('Approvals API Routes', () => {
         type: 'WAIVER',
         addPlayerId: 'nfl.p.12345',
         dropPlayerId: 'nfl.p.23456',
-        fabBid: 15
-      }
+        fabBid: 15,
+      },
     };
 
     it('successfully executes approved recommendation', async () => {
       vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(mockRecommendation);
-      vi.mocked(yahooService.callYahoo).mockResolvedValue({ 
-        success: true, 
-        transactionId: 'trans_123' 
+      vi.mocked(yahooService.callYahoo).mockResolvedValue({
+        success: true,
+        transactionId: 'trans_123',
       });
 
       const response = await request(app)
@@ -155,15 +148,13 @@ describe('Approvals API Routes', () => {
         data: {
           status: 'EXECUTED',
           executedAt: expect.any(Date),
-          executionResult: { success: true, transactionId: 'trans_123' }
-        }
+          executionResult: { success: true, transactionId: 'trans_123' },
+        },
       });
     });
 
     it('returns 400 for invalid request body', async () => {
-      const response = await request(app)
-        .post('/approvals/approve')
-        .send({}); // Missing required id
+      const response = await request(app).post('/approvals/approve').send({}); // Missing required id
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Invalid body');
@@ -172,9 +163,7 @@ describe('Approvals API Routes', () => {
     it('returns 404 for non-existent recommendation', async () => {
       vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(null);
 
-      const response = await request(app)
-        .post('/approvals/approve')
-        .send({ id: 'nonexistent' });
+      const response = await request(app).post('/approvals/approve').send({ id: 'nonexistent' });
 
       expect(response.status).toBe(404);
       expect(response.body.error).toBe('Not found');
@@ -183,13 +172,11 @@ describe('Approvals API Routes', () => {
     it('returns 400 for recommendation not in STAGED status', async () => {
       const executedRecommendation = {
         ...mockRecommendation,
-        status: 'EXECUTED'
+        status: 'EXECUTED',
       };
       vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(executedRecommendation);
 
-      const response = await request(app)
-        .post('/approvals/approve')
-        .send({ id: 'rec_123' });
+      const response = await request(app).post('/approvals/approve').send({ id: 'rec_123' });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Recommendation is not staged for approval');
@@ -197,14 +184,12 @@ describe('Approvals API Routes', () => {
 
     it('handles Yahoo API execution failure', async () => {
       vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(mockRecommendation);
-      vi.mocked(yahooService.callYahoo).mockResolvedValue({ 
-        success: false, 
-        reason: 'TRANSACTION_FAILED' 
+      vi.mocked(yahooService.callYahoo).mockResolvedValue({
+        success: false,
+        reason: 'TRANSACTION_FAILED',
       });
 
-      const response = await request(app)
-        .post('/approvals/approve')
-        .send({ id: 'rec_123' });
+      const response = await request(app).post('/approvals/approve').send({ id: 'rec_123' });
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Yahoo API execution failed');
@@ -214,8 +199,8 @@ describe('Approvals API Routes', () => {
       expect(vi.mocked(prisma.recommendation.update)).toHaveBeenCalledWith({
         where: { id: 'rec_123' },
         data: {
-          executionResult: { success: false, reason: 'TRANSACTION_FAILED' }
-        }
+          executionResult: { success: false, reason: 'TRANSACTION_FAILED' },
+        },
       });
     });
 
@@ -223,9 +208,7 @@ describe('Approvals API Routes', () => {
       vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(mockRecommendation);
       vi.mocked(yahooService.userTeamKey).mockResolvedValue(null);
 
-      const response = await request(app)
-        .post('/approvals/approve')
-        .send({ id: 'rec_123' });
+      const response = await request(app).post('/approvals/approve').send({ id: 'rec_123' });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Could not find team key for user in league');
@@ -237,22 +220,20 @@ describe('Approvals API Routes', () => {
         // Mock yahoo client object
         game: { meta: vi.fn() },
         league: { meta: vi.fn() },
-        user: { game_teams: vi.fn() }
+        user: { game_teams: vi.fn() },
       });
       // Reset the userTeamKey mock to return a valid team key
       vi.mocked(yahooService.userTeamKey).mockResolvedValue('431.l.123456.t.1');
-      vi.mocked(yahooService.callYahoo).mockResolvedValue({ 
-        success: true, 
-        transactionId: 'trans_123' 
+      vi.mocked(yahooService.callYahoo).mockResolvedValue({
+        success: true,
+        transactionId: 'trans_123',
       });
       vi.mocked(prisma.recommendation.update).mockResolvedValue({
         ...mockRecommendation,
-        status: 'EXECUTED'
+        status: 'EXECUTED',
       });
 
-      const response = await request(app)
-        .post('/approvals/approve')
-        .send({ id: 'rec_123' }); // No userId provided
+      const response = await request(app).post('/approvals/approve').send({ id: 'rec_123' }); // No userId provided
 
       expect(response.status).toBe(200);
       expect(vi.mocked(yahooService.yfForUser)).toHaveBeenCalledWith('dev');
@@ -263,35 +244,29 @@ describe('Approvals API Routes', () => {
     it('successfully rejects recommendation', async () => {
       vi.mocked(prisma.recommendation.update).mockResolvedValue({
         id: 'rec_123',
-        status: 'REJECTED'
+        status: 'REJECTED',
       });
 
-      const response = await request(app)
-        .post('/approvals/reject')
-        .send({ id: 'rec_123' });
+      const response = await request(app).post('/approvals/reject').send({ id: 'rec_123' });
 
       expect(response.status).toBe(200);
       expect(response.body.ok).toBe(true);
 
       expect(vi.mocked(prisma.recommendation.update)).toHaveBeenCalledWith({
         where: { id: 'rec_123' },
-        data: { status: 'REJECTED' }
+        data: { status: 'REJECTED' },
       });
     });
 
     it('returns 400 for invalid request body', async () => {
-      const response = await request(app)
-        .post('/approvals/reject')
-        .send({}); // Missing required id
+      const response = await request(app).post('/approvals/reject').send({}); // Missing required id
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Invalid body');
     });
 
     it('returns 400 for empty id', async () => {
-      const response = await request(app)
-        .post('/approvals/reject')
-        .send({ id: '' });
+      const response = await request(app).post('/approvals/reject').send({ id: '' });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Invalid body');
@@ -303,23 +278,25 @@ describe('Approvals API Routes', () => {
     // Individual route error handling is tested via specific error scenarios above
 
     it('handles Yahoo service errors gracefully', async () => {
+      // Silence expected error log for this test only
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const mockRecommendation = {
         id: 'rec_123',
-        leagueId: '123456', 
+        leagueId: '123456',
         status: 'STAGED',
-        payload: { type: 'WAIVER' }
+        payload: { type: 'WAIVER' },
       };
-      
+
       vi.mocked(prisma.recommendation.findUnique).mockResolvedValue(mockRecommendation);
       vi.mocked(yahooService.yfForUser).mockRejectedValue(new Error('Yahoo service error'));
 
-      const response = await request(app)
-        .post('/approvals/approve')
-        .send({ id: 'rec_123' });
+      const response = await request(app).post('/approvals/approve').send({ id: 'rec_123' });
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Execution error');
       expect(response.body.message).toBe('Yahoo service error');
+
+      errSpy.mockRestore();
     });
   });
 });

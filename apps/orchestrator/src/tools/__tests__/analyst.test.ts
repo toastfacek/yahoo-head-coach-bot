@@ -3,9 +3,9 @@ import { describe, it, expect, vi } from 'vitest';
 // Test the FLEX_MAP logic from analyst tool
 const FLEX_MAP: Record<string, string[]> = {
   'W/R/T': ['WR', 'RB', 'TE'],
-  'WR/RB': ['WR', 'RB'], 
+  'WR/RB': ['WR', 'RB'],
   'Q/W/R/T': ['QB', 'WR', 'RB', 'TE'],
-  'FLEX': ['WR', 'RB', 'TE'],
+  FLEX: ['WR', 'RB', 'TE'],
 };
 
 // Can a player with eligible positions fill a lineup slot (including flex rules)?
@@ -74,35 +74,35 @@ describe('Analyst Tool - Position Logic', () => {
       { player_id: '3', name: { full: 'Questionable Player' }, status: 'Q' },
       { player_id: '4', name: { full: 'Doubtful Player' }, status: 'D' },
       { player_id: '5', name: { full: 'IR Player' }, status: 'IR' },
-      { player_id: '6', name: { full: 'No Status' } }
+      { player_id: '6', name: { full: 'No Status' } },
     ];
 
     it('filters injured players correctly', () => {
-      const out = mockRoster.filter(p => /^(O|OUT)$/i.test(p.status || ''));
-      const questionable = mockRoster.filter(p => /^(Q|Questionable)$/i.test(p.status || ''));
-      const doubtful = mockRoster.filter(p => /^(D|Doubtful)$/i.test(p.status || ''));
-      const ir = mockRoster.filter(p => /IR|PUP|NFI|SUSP/i.test(p.status || ''));
+      const out = mockRoster.filter((p) => /^(O|OUT)$/i.test(p.status || ''));
+      const questionable = mockRoster.filter((p) => /^(Q|Questionable)$/i.test(p.status || ''));
+      const doubtful = mockRoster.filter((p) => /^(D|Doubtful)$/i.test(p.status || ''));
+      const ir = mockRoster.filter((p) => /IR|PUP|NFI|SUSP/i.test(p.status || ''));
 
       expect(out).toHaveLength(1);
       expect(out[0].player_id).toBe('2');
-      
+
       expect(questionable).toHaveLength(1);
       expect(questionable[0].player_id).toBe('3');
-      
+
       expect(doubtful).toHaveLength(1);
       expect(doubtful[0].player_id).toBe('4');
-      
+
       expect(ir).toHaveLength(1);
       expect(ir[0].player_id).toBe('5');
     });
 
     it('identifies players needing attention', () => {
-      const needsAttention = mockRoster.filter(p => 
+      const needsAttention = mockRoster.filter((p) =>
         /^(Q|D|O|IR|PUP|NFI|SUSP)$/i.test(p.status || '')
       );
 
       expect(needsAttention).toHaveLength(4);
-      expect(needsAttention.map(p => p.player_id)).toEqual(['2', '3', '4', '5']);
+      expect(needsAttention.map((p) => p.player_id)).toEqual(['2', '3', '4', '5']);
     });
   });
 
@@ -111,13 +111,14 @@ describe('Analyst Tool - Position Logic', () => {
       const simpleScenario = {
         injuredPlayers: 0,
         flexEligiblePlayers: 2,
-        marginalDecisions: 1
+        marginalDecisions: 1,
       };
 
       // Simple scenario should not trigger AI analysis
-      const shouldUseAI = simpleScenario.injuredPlayers >= 2 || 
-                          simpleScenario.flexEligiblePlayers >= 4 ||
-                          simpleScenario.marginalDecisions >= 3;
+      const shouldUseAI =
+        simpleScenario.injuredPlayers >= 2 ||
+        simpleScenario.flexEligiblePlayers >= 4 ||
+        simpleScenario.marginalDecisions >= 3;
 
       expect(shouldUseAI).toBe(false);
     });
@@ -126,12 +127,13 @@ describe('Analyst Tool - Position Logic', () => {
       const complexScenario = {
         injuredPlayers: 3,
         flexEligiblePlayers: 5,
-        marginalDecisions: 4
+        marginalDecisions: 4,
       };
 
-      const shouldUseAI = complexScenario.injuredPlayers >= 2 || 
-                          complexScenario.flexEligiblePlayers >= 4 ||
-                          complexScenario.marginalDecisions >= 3;
+      const shouldUseAI =
+        complexScenario.injuredPlayers >= 2 ||
+        complexScenario.flexEligiblePlayers >= 4 ||
+        complexScenario.marginalDecisions >= 3;
 
       expect(shouldUseAI).toBe(true);
     });
@@ -139,21 +141,23 @@ describe('Analyst Tool - Position Logic', () => {
 
   describe('starter/bench classification', () => {
     const mockRoster = [
-      { player_id: '1', selected_position: 'QB', name: { full: 'Starting QB' }},
-      { player_id: '2', selected_position: 'BN', name: { full: 'Bench Player' }},
-      { player_id: '3', selected_position: 'RB', name: { full: 'Starting RB' }},
-      { player_id: '4', selected_position: undefined, name: { full: 'Unset Player' }}
+      { player_id: '1', selected_position: 'QB', name: { full: 'Starting QB' } },
+      { player_id: '2', selected_position: 'BN', name: { full: 'Bench Player' } },
+      { player_id: '3', selected_position: 'RB', name: { full: 'Starting RB' } },
+      { player_id: '4', selected_position: undefined, name: { full: 'Unset Player' } },
     ];
 
     it('correctly identifies starters and bench players', () => {
-      const starters = mockRoster.filter(p => p.selected_position && p.selected_position !== 'BN');
-      const bench = mockRoster.filter(p => !p.selected_position || p.selected_position === 'BN');
+      const starters = mockRoster.filter(
+        (p) => p.selected_position && p.selected_position !== 'BN'
+      );
+      const bench = mockRoster.filter((p) => !p.selected_position || p.selected_position === 'BN');
 
       expect(starters).toHaveLength(2);
-      expect(starters.map(p => p.player_id)).toEqual(['1', '3']);
-      
-      expect(bench).toHaveLength(2); 
-      expect(bench.map(p => p.player_id)).toEqual(['2', '4']);
+      expect(starters.map((p) => p.player_id)).toEqual(['1', '3']);
+
+      expect(bench).toHaveLength(2);
+      expect(bench.map((p) => p.player_id)).toEqual(['2', '4']);
     });
   });
 });

@@ -16,7 +16,7 @@ export const WaiverRecommendationSchema = z.object({
   drop_candidate: z.string().optional(),
   risk_factors: z.array(z.string()),
   upside_factors: z.array(z.string()),
-  priority_rank: z.number()
+  priority_rank: z.number(),
 });
 
 export const LineupRecommendationSchema = z.object({
@@ -28,7 +28,7 @@ export const LineupRecommendationSchema = z.object({
   reasoning: z.string(),
   weather_impact: z.string().optional(),
   matchup_grade: z.string().optional(),
-  projected_points: z.number().optional()
+  projected_points: z.number().optional(),
 });
 
 export const AnalysisResponseSchema = z.object({
@@ -37,7 +37,7 @@ export const AnalysisResponseSchema = z.object({
   waiver_recommendations: z.array(WaiverRecommendationSchema),
   key_insights: z.array(z.string()),
   risk_alerts: z.array(z.string()),
-  priority_actions: z.array(z.any())
+  priority_actions: z.array(z.any()),
 });
 
 export type WaiverRecommendation = z.infer<typeof WaiverRecommendationSchema>;
@@ -46,7 +46,7 @@ export type AnalysisResponse = z.infer<typeof AnalysisResponseSchema>;
 
 /**
  * AI-Powered Analyst Sub-Agent for sophisticated fantasy football analysis
- * 
+ *
  * Key capabilities:
  * - Multi-factor waiver wire analysis with FAB optimization
  * - Advanced lineup optimization considering weather, matchups, game scripts
@@ -62,7 +62,7 @@ export class AnalystAgent {
 
   /**
    * Multi-factor waiver wire analysis with sophisticated reasoning
-   * 
+   *
    * Analyzes opportunity, matchups, ROS value, and cost-benefit to recommend
    * optimal FAB allocation across available players
    */
@@ -147,9 +147,9 @@ Focus on 3-7 top targets with actionable recommendations. Be specific with bid a
         system: systemPrompt,
         prompt: prompt,
         schema: z.object({
-          recommendations: z.array(WaiverRecommendationSchema)
+          recommendations: z.array(WaiverRecommendationSchema),
         }),
-        maxTokens: 2500
+        maxTokens: 2500,
       });
 
       return result.object.recommendations;
@@ -161,7 +161,7 @@ Focus on 3-7 top targets with actionable recommendations. Be specific with bid a
 
   /**
    * Advanced lineup optimization considering all available factors
-   * 
+   *
    * Analyzes matchups, weather, game scripts, player form to recommend
    * optimal weekly lineup decisions
    */
@@ -247,9 +247,9 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
         system: systemPrompt,
         prompt: prompt,
         schema: z.object({
-          lineup_changes: z.array(LineupRecommendationSchema)
+          lineup_changes: z.array(LineupRecommendationSchema),
         }),
-        maxTokens: 2000
+        maxTokens: 2000,
       });
 
       return result.object.lineup_changes;
@@ -261,7 +261,7 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
 
   /**
    * Comprehensive weekly analysis combining waiver and lineup strategy
-   * 
+   *
    * Provides holistic team management recommendations with priority actions
    */
   async performWeeklyAnalysis(input: {
@@ -284,7 +284,7 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
           rosterNeeds: input.rosterNeeds,
           fabBudget: input.fabBudget,
           teamRoster: input.roster,
-          week: input.week
+          week: input.week,
         }),
         this.optimizeLineup({
           roster: input.roster,
@@ -292,8 +292,8 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
           weather: input.weather,
           vegasLines: input.vegasLines,
           news: input.news,
-          week: input.week
-        })
+          week: input.week,
+        }),
       ]);
 
       // Generate strategic insights and priority actions
@@ -308,7 +308,7 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
         waiver_recommendations: waiverAnalysis,
         key_insights: keyInsights,
         risk_alerts: riskAlerts,
-        priority_actions: priorityActions
+        priority_actions: priorityActions,
       };
     } catch (error) {
       console.error('AnalystAgent weekly analysis error:', error);
@@ -321,13 +321,13 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
    */
   private parseWaiverRecommendations(text: string, input: any): WaiverRecommendation[] {
     const recommendations: WaiverRecommendation[] = [];
-    
+
     try {
       // Extract structured data from AI response
       const lines = text.split('\n');
       let currentRec: Partial<WaiverRecommendation> = {};
       let priority = 1;
-      
+
       for (const line of lines) {
         // Look for player names (usually in bold or numbered format)
         const playerMatch = line.match(/^\d+\.\s*([A-Za-z\s]+)\s*\(([A-Z]+)\)/);
@@ -338,10 +338,10 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
           currentRec = {
             player_name: playerMatch[1].trim(),
             position: playerMatch[2],
-            player_id: `${playerMatch[1].trim().replace(/\s+/g, '_')}_${Date.now()}`
+            player_id: `${playerMatch[1].trim().replace(/\s+/g, '_')}_${Date.now()}`,
           };
         }
-        
+
         // Extract FAB bid amounts
         const fabMatch = line.match(/\$(\d+)/);
         if (fabMatch && currentRec.player_name) {
@@ -349,29 +349,29 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
           currentRec.fab_bid = bid;
           currentRec.fab_percentage = Math.round((bid / input.fabBudget) * 100);
         }
-        
+
         // Extract confidence scores
         const confMatch = line.match(/(\d{2,3})%|confidence[:\s]+(\d{2,3})/i);
         if (confMatch && currentRec.player_name) {
           currentRec.confidence = parseInt(confMatch[1] || confMatch[2]);
         }
-        
+
         // Extract reasoning (lines with analysis keywords)
         if (line.includes('reason') || line.includes('opportunity') || line.includes('upside')) {
           currentRec.reasoning = (currentRec.reasoning || '') + ' ' + line.trim();
         }
       }
-      
+
       // Add final recommendation
       if (currentRec.player_name) {
         recommendations.push(this.completeWaiverRecommendation(currentRec, priority, input));
       }
-      
+
       // If parsing failed, create fallback recommendations from available players
       if (recommendations.length === 0) {
         return this.createFallbackWaiverRecommendations(text, input);
       }
-      
+
       return recommendations.slice(0, 7); // Top 7 recommendations
     } catch (error) {
       console.error('Error parsing waiver recommendations:', error);
@@ -379,7 +379,10 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
     }
   }
 
-  private parseLineupOptimization(text: string, input: any): {
+  private parseLineupOptimization(
+    text: string,
+    input: any
+  ): {
     lineup_recommendations: LineupRecommendation[];
     analysis: string;
     key_decisions: any[];
@@ -388,18 +391,18 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
     const recommendations: LineupRecommendation[] = [];
     const keyDecisions: any[] = [];
     const weatherAlerts: string[] = [];
-    
+
     try {
       // Parse lineup decisions for each roster player
       input.roster.forEach((player: any, index: number) => {
         const playerText = text.toLowerCase();
         const playerName = player.name?.toLowerCase() || '';
-        
+
         // Determine action based on AI analysis
         let action: 'start' | 'bench' | 'monitor' = 'start';
         let confidence = 75;
         let reasoning = 'Standard lineup decision';
-        
+
         if (playerText.includes(playerName)) {
           if (playerText.includes('bench') || playerText.includes('sit')) {
             action = 'bench';
@@ -415,14 +418,17 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
             reasoning = 'AI analysis supports starting based on favorable matchup';
           }
         }
-        
+
         // Check for weather mentions
         let weatherImpact = undefined;
-        if (input.weather?.length && (playerText.includes('wind') || playerText.includes('weather'))) {
+        if (
+          input.weather?.length &&
+          (playerText.includes('wind') || playerText.includes('weather'))
+        ) {
           weatherImpact = 'Weather conditions may impact performance';
           weatherAlerts.push(`${player.name}: Weather may affect performance`);
         }
-        
+
         recommendations.push({
           player_id: player.player_id || `player_${index}`,
           player_name: player.name || `Player ${index + 1}`,
@@ -432,25 +438,25 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
           reasoning,
           weather_impact: weatherImpact,
           matchup_grade: this.generateMatchupGrade(),
-          projected_points: Math.floor(Math.random() * 20) + 8 // Placeholder projection
+          projected_points: Math.floor(Math.random() * 20) + 8, // Placeholder projection
         });
-        
+
         // Flag key decisions
         if (player.status && ['Q', 'D', 'O'].includes(player.status)) {
           keyDecisions.push({
             player: player.name,
             decision: `${player.status === 'O' ? 'OUT' : player.status} status requires decision`,
             confidence: confidence,
-            reasoning: `Injury designation creates lineup uncertainty`
+            reasoning: `Injury designation creates lineup uncertainty`,
           });
         }
       });
-      
+
       return {
         lineup_recommendations: recommendations,
         analysis: text,
         key_decisions: keyDecisions,
-        weather_alerts: weatherAlerts
+        weather_alerts: weatherAlerts,
       };
     } catch (error) {
       console.error('Error parsing lineup optimization:', error);
@@ -460,12 +466,12 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
 
   // Helper methods for structured data completion and fallbacks
   private completeWaiverRecommendation(
-    partial: Partial<WaiverRecommendation>, 
-    priority: number, 
+    partial: Partial<WaiverRecommendation>,
+    priority: number,
     input: any
   ): WaiverRecommendation {
     const fabBid = partial.fab_bid || Math.max(1, Math.floor(input.fabBudget * 0.1));
-    
+
     return {
       player_id: partial.player_id || `unknown_${Date.now()}`,
       player_name: partial.player_name || 'Unknown Player',
@@ -476,7 +482,7 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
       reasoning: partial.reasoning || 'AI analysis suggests potential value',
       risk_factors: ['Standard injury risk', 'Role competition'],
       upside_factors: ['Opportunity for increased usage', 'Favorable matchup potential'],
-      priority_rank: priority
+      priority_rank: priority,
     };
   }
 
@@ -487,11 +493,11 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
       position: player.positions?.[0] || player.position || 'FLEX',
       fab_bid: Math.max(1, Math.floor(input.fabBudget * 0.08)),
       fab_percentage: 8,
-      confidence: 70 - (index * 5),
+      confidence: 70 - index * 5,
       reasoning: `Fallback analysis based on availability and team needs`,
       risk_factors: ['Limited analysis available'],
       upside_factors: ['Available player with potential'],
-      priority_rank: index + 1
+      priority_rank: index + 1,
     }));
   }
 
@@ -504,18 +510,21 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
     const recommendations = input.roster.map((player: any, index: number) => ({
       player_id: player.player_id || `fallback_${index}`,
       player_name: player.name || `Player ${index + 1}`,
-      action: (player.selected_position && player.selected_position !== 'BN') ? 'start' : 'bench' as const,
+      action:
+        player.selected_position && player.selected_position !== 'BN'
+          ? 'start'
+          : ('bench' as const),
       position_slot: player.selected_position || 'BN',
       confidence: 75,
       reasoning: 'Fallback lineup analysis',
-      projected_points: 12
+      projected_points: 12,
     }));
 
     return {
       lineup_recommendations: recommendations,
       analysis: 'Fallback analysis due to parsing error',
       key_decisions: [],
-      weather_alerts: []
+      weather_alerts: [],
     };
   }
 
@@ -525,104 +534,133 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
     return grades[Math.floor(Math.random() * grades.length)];
   }
 
-  private extractKeyInsights(waiverRecs: WaiverRecommendation[], lineupAnalysis: any, input: any): string[] {
+  private extractKeyInsights(
+    waiverRecs: WaiverRecommendation[],
+    lineupAnalysis: any,
+    input: any
+  ): string[] {
     const insights = [];
-    
+
     if (waiverRecs.length > 0) {
       const topTarget = waiverRecs[0];
-      insights.push(`Top waiver priority: ${topTarget.player_name} (${topTarget.confidence}% confidence, $${topTarget.fab_bid} bid)`);
+      insights.push(
+        `Top waiver priority: ${topTarget.player_name} (${topTarget.confidence}% confidence, $${topTarget.fab_bid} bid)`
+      );
     }
-    
-    const highConfidenceLineup = lineupAnalysis.lineup_recommendations.filter((rec: any) => rec.confidence >= 85);
+
+    const highConfidenceLineup = lineupAnalysis.lineup_recommendations.filter(
+      (rec: any) => rec.confidence >= 85
+    );
     if (highConfidenceLineup.length > 0) {
       insights.push(`${highConfidenceLineup.length} high-confidence lineup decisions identified`);
     }
-    
+
     if (lineupAnalysis.weather_alerts?.length > 0) {
       insights.push(`Weather concerns for ${lineupAnalysis.weather_alerts.length} players`);
     }
-    
-    insights.push(`Analysis complete for Week ${input.week || 'Current'} with $${input.fabBudget} FAB remaining`);
-    
+
+    insights.push(
+      `Analysis complete for Week ${input.week || 'Current'} with $${input.fabBudget} FAB remaining`
+    );
+
     return insights;
   }
 
-  private identifyRiskAlerts(waiverRecs: WaiverRecommendation[], lineupAnalysis: any, input: any): string[] {
+  private identifyRiskAlerts(
+    waiverRecs: WaiverRecommendation[],
+    lineupAnalysis: any,
+    input: any
+  ): string[] {
     const alerts = [];
-    
+
     // High FAB spending alerts
-    const expensiveClaims = waiverRecs.filter(rec => rec.fab_percentage > 20);
+    const expensiveClaims = waiverRecs.filter((rec) => rec.fab_percentage > 20);
     if (expensiveClaims.length > 0) {
       alerts.push(`High FAB spending: ${expensiveClaims.length} claims over 20% of budget`);
     }
-    
+
     // Injury risk alerts
-    const injuredPlayers = input.roster.filter((p: any) => p.status && ['Q', 'D', 'O'].includes(p.status));
+    const injuredPlayers = input.roster.filter(
+      (p: any) => p.status && ['Q', 'D', 'O'].includes(p.status)
+    );
     if (injuredPlayers.length > 0) {
       alerts.push(`${injuredPlayers.length} players with injury designations require monitoring`);
     }
-    
+
     // Weather alerts
     if (lineupAnalysis.weather_alerts?.length > 0) {
       alerts.push(`Weather impact expected for ${lineupAnalysis.weather_alerts.length} players`);
     }
-    
+
     return alerts;
   }
 
   private prioritizeActions(waiverRecs: WaiverRecommendation[], lineupAnalysis: any): any[] {
     const actions = [];
-    
+
     // High-confidence waiver claims
-    waiverRecs.filter(rec => rec.confidence >= 80).forEach(rec => {
-      actions.push({
-        type: 'waiver_claim',
-        priority: rec.confidence >= 90 ? 'critical' : 'high',
-        action: `Bid $${rec.fab_bid} on ${rec.player_name}`,
-        confidence: rec.confidence,
-        reasoning: rec.reasoning
+    waiverRecs
+      .filter((rec) => rec.confidence >= 80)
+      .forEach((rec) => {
+        actions.push({
+          type: 'waiver_claim',
+          priority: rec.confidence >= 90 ? 'critical' : 'high',
+          action: `Bid $${rec.fab_bid} on ${rec.player_name}`,
+          confidence: rec.confidence,
+          reasoning: rec.reasoning,
+        });
       });
-    });
-    
+
     // Critical lineup decisions
-    lineupAnalysis.key_decisions?.filter((dec: any) => dec.confidence >= 80).forEach((dec: any) => {
-      actions.push({
-        type: 'lineup_decision',
-        priority: 'high',
-        action: dec.decision,
-        confidence: dec.confidence,
-        reasoning: dec.reasoning
+    lineupAnalysis.key_decisions
+      ?.filter((dec: any) => dec.confidence >= 80)
+      .forEach((dec: any) => {
+        actions.push({
+          type: 'lineup_decision',
+          priority: 'high',
+          action: dec.decision,
+          confidence: dec.confidence,
+          reasoning: dec.reasoning,
+        });
       });
-    });
-    
+
     return actions.slice(0, 8); // Top 8 priority actions
   }
 
-  private generateStrategicSummary(waiverRecs: WaiverRecommendation[], lineupAnalysis: any, input: any): string {
+  private generateStrategicSummary(
+    waiverRecs: WaiverRecommendation[],
+    lineupAnalysis: any,
+    input: any
+  ): string {
     const topTarget = waiverRecs[0]?.player_name || 'None identified';
     const keyDecisions = lineupAnalysis.key_decisions?.length || 0;
     const totalActions = waiverRecs.length + keyDecisions;
-    
+
     return `Week ${input.week || 'Current'} Strategic Analysis: ${totalActions} total recommendations generated. Primary waiver target: ${topTarget}. ${keyDecisions} critical lineup decisions require attention. FAB budget: $${input.fabBudget} available for strategic acquisitions.`;
   }
 
   // Error response helpers
-  private createErrorWaiverResponse(error: any, input: any): WaiverRecommendation[] {
-    return [{
-      player_id: 'error_response',
-      player_name: 'Analysis Error',
-      position: 'N/A',
-      fab_bid: 0,
-      fab_percentage: 0,
-      confidence: 0,
-      reasoning: `Waiver analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      risk_factors: ['Analysis failure'],
-      upside_factors: [],
-      priority_rank: 1
-    }];
+  private createErrorWaiverResponse(error: any, _input: any): WaiverRecommendation[] {
+    return [
+      {
+        player_id: 'error_response',
+        player_name: 'Analysis Error',
+        position: 'N/A',
+        fab_bid: 0,
+        fab_percentage: 0,
+        confidence: 0,
+        reasoning: `Waiver analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        risk_factors: ['Analysis failure'],
+        upside_factors: [],
+        priority_rank: 1,
+      },
+    ];
   }
 
-  private createErrorLineupResponse(error: any, input: any): {
+  private createErrorLineupResponse(
+    error: any,
+    input: any
+  ): {
     lineup_recommendations: LineupRecommendation[];
     analysis: string;
     key_decisions: any[];
@@ -636,22 +674,22 @@ Week ${input.week || 'Current'} - Focus on actionable decisions with confidence 
         position_slot: player.selected_position || 'BN',
         confidence: 50,
         reasoning: `Lineup analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        projected_points: 10
+        projected_points: 10,
       })),
       analysis: `Lineup optimization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       key_decisions: [],
-      weather_alerts: []
+      weather_alerts: [],
     };
   }
 
-  private createErrorAnalysisResponse(error: any, input: any): AnalysisResponse {
+  private createErrorAnalysisResponse(error: any, _input: any): AnalysisResponse {
     return {
       summary: `Weekly analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       lineup_recommendations: [],
       waiver_recommendations: [],
       key_insights: ['Analysis system encountered an error'],
       risk_alerts: ['Unable to perform risk assessment'],
-      priority_actions: []
+      priority_actions: [],
     };
   }
 }

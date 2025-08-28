@@ -1,20 +1,50 @@
 // Historian tool: persist and retrieve records for memory/audit
 import { prisma } from '../db';
 
-export async function getRecentSignals({ leagueId, kinds, limit = 5 }:{ leagueId:string; kinds?: string[]; limit?: number }) {
-  const where:any = { leagueId };
+export async function getRecentSignals({
+  leagueId,
+  kinds,
+  limit = 5,
+}: {
+  leagueId: string;
+  kinds?: string[];
+  limit?: number;
+}) {
+  const where: any = { leagueId };
   if (kinds && kinds.length) where.kind = { in: kinds } as any;
-  const rows = await prisma.signal.findMany({ where, orderBy: { asOf: 'desc' }, take: Math.min(limit, 50) });
+  const rows = await prisma.signal.findMany({
+    where,
+    orderBy: { asOf: 'desc' },
+    take: Math.min(limit, 50),
+  });
   return rows;
 }
 
-export async function getRecentRecommendations({ leagueId, status, limit = 5 }:{ leagueId:string; status?: string; limit?: number }) {
-  const where:any = { leagueId };
+export async function getRecentRecommendations({
+  leagueId,
+  status,
+  limit = 5,
+}: {
+  leagueId: string;
+  status?: string;
+  limit?: number;
+}) {
+  const where: any = { leagueId };
   if (status) where.status = status;
-  return prisma.recommendation.findMany({ where, orderBy: { createdAt: 'desc' }, take: Math.min(limit, 50) });
+  return prisma.recommendation.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: Math.min(limit, 50),
+  });
 }
 
-export async function getRecentDecisions({ leagueId, limit = 5 }:{ leagueId:string; limit?: number }) {
+export async function getRecentDecisions({
+  leagueId: _leagueId,
+  limit = 5,
+}: {
+  leagueId: string;
+  limit?: number;
+}) {
   // We don't have leagueId on Decision; join via Recommendation if needed in future.
   return prisma.decision.findMany({ orderBy: { executedAt: 'desc' }, take: Math.min(limit, 50) });
 }

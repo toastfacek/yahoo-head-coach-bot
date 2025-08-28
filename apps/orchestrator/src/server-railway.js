@@ -19,7 +19,7 @@ app.get('/', (req, res) => {
     status: 'ok',
     service: 'orchestrator',
     message: 'Yahoo Fantasy HeadCoach API is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -30,7 +30,7 @@ app.get('/api/health', (req, res) => {
     service: 'orchestrator',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'production'
+    environment: process.env.NODE_ENV || 'production',
   });
 });
 
@@ -39,7 +39,7 @@ app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Not Found',
     message: `Route ${req.originalUrl} not found`,
-    service: 'orchestrator'
+    service: 'orchestrator',
   });
 });
 

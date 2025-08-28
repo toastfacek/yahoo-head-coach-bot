@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+
 import { runHeadCoach } from '../agents/headCoach';
 
 export async function dailyReport(req: Request, res: Response) {

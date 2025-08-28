@@ -2,10 +2,16 @@
 // Enhanced with Rube MCP integration for social sentiment and news analysis
 // Notes:
 // - Read-only Yahoo calls using bearer auth from stored tokens
-// - Integrates social intelligence via ExternalDataService  
+// - Integrates social intelligence via ExternalDataService
 // - Produces enriched payload with context for analyst tool
-import { yfForUser, getGameKey, leagueKeyFor, userTeamKey, isLeaguePostDraft } from '../services/yahoo';
 import { externalDataService } from '../services/externalData';
+import {
+  yfForUser,
+  getGameKey,
+  leagueKeyFor,
+  userTeamKey,
+  isLeaguePostDraft,
+} from '../services/yahoo';
 
 // Enhanced player data with social intelligence
 type ScoutPlayer = {
@@ -20,12 +26,12 @@ type ScoutPlayer = {
   reddit_mentions?: number;
 };
 
-export async function scout({ 
-  leagueId, 
+export async function scout({
+  leagueId,
   userId = 'dev',
-  includeSocialIntel = true 
-}: { 
-  leagueId: string; 
+  includeSocialIntel = true,
+}: {
+  leagueId: string;
   userId?: string;
   includeSocialIntel?: boolean;
 }) {
@@ -56,16 +62,16 @@ export async function scout({
     let roster = baseRoster;
     let socialIntelligence = null;
     let weatherContext = null;
-    
+
     if (includeSocialIntel) {
       try {
         console.log('Gathering social intelligence for roster players...');
-        
+
         // Get player names for social analysis (focus on key positions)
         const keyPlayers = baseRoster
-          .filter(p => p.selected_position && p.selected_position !== 'BN')
+          .filter((p) => p.selected_position && p.selected_position !== 'BN')
           .slice(0, 8) // Limit to avoid too many API calls
-          .map(p => p.name);
+          .map((p) => p.name);
 
         // Parallel data gathering via ExternalDataService
         const [redditSentiment, fantasyNews, weatherData] = await Promise.all([
@@ -73,42 +79,45 @@ export async function scout({
           externalDataService.getFantasyNews({
             players: keyPlayers,
             limit: 10,
-            hours_back: 24
+            hours_back: 24,
           }),
           externalDataService.getWeatherData({
             outdoor_only: true,
-            week: getCurrentNFLWeek()
-          })
+            week: getCurrentNFLWeek(),
+          }),
         ]);
 
         // Enhance roster with social intelligence
-        roster = baseRoster.map(player => {
-          const sentiment = redditSentiment.find(s => s.player === player.name);
-          const playerNews = fantasyNews.filter(news => 
-            news.player_ids.some(id => id === String(player.player_id)) ||
-            news.title.toLowerCase().includes(player.name.toLowerCase())
+        roster = baseRoster.map((player) => {
+          const sentiment = redditSentiment.find((s) => s.player === player.name);
+          const playerNews = fantasyNews.filter(
+            (news) =>
+              news.player_ids.some((id) => id === String(player.player_id)) ||
+              news.title.toLowerCase().includes(player.name.toLowerCase())
           );
 
           return {
             ...player,
             social_sentiment: sentiment?.sentiment || 'neutral',
-            recent_news: playerNews.map(n => n.title),
-            reddit_mentions: sentiment?.posts?.length || 0
+            recent_news: playerNews.map((n) => n.title),
+            reddit_mentions: sentiment?.posts?.length || 0,
           };
         });
 
         socialIntelligence = {
           reddit_sentiment: redditSentiment,
           recent_news: fantasyNews,
-          news_summary: `Found ${fantasyNews.length} recent news items affecting roster players`
+          news_summary: `Found ${fantasyNews.length} recent news items affecting roster players`,
         };
 
         weatherContext = {
           conditions: weatherData,
-          summary: `Weather data for ${weatherData.length} outdoor games this week`
+          summary: `Weather data for ${weatherData.length} outdoor games this week`,
         };
 
-        console.log(`Social intelligence gathered: ${redditSentiment.length} Reddit analyses, ${fantasyNews.length} news items`);
+        console.log(
+          `Social intelligence gathered: ${redditSentiment.length} Reddit analyses, ${fantasyNews.length} news items`
+        );
       } catch (socialError) {
         console.warn('Social intelligence gathering failed:', socialError);
         // Continue with base roster if social intel fails
@@ -125,7 +134,7 @@ export async function scout({
       // Enhanced: Players with negative social sentiment (potential concerns)
       social_concerns: roster.filter((p) => p.social_sentiment === 'negative'),
       // Enhanced: Players with recent news (need monitoring)
-      news_worthy: roster.filter((p) => p.recent_news && p.recent_news.length > 0)
+      news_worthy: roster.filter((p) => p.recent_news && p.recent_news.length > 0),
     };
 
     // Enhanced payload with social intelligence for analyst consumption
@@ -141,19 +150,20 @@ export async function scout({
       // Enhanced: Key insights summary
       insights: {
         total_players: roster.length,
-        injury_concerns: injuries.out.length + injuries.doubtful.length + injuries.questionable.length,
+        injury_concerns:
+          injuries.out.length + injuries.doubtful.length + injuries.questionable.length,
         social_concerns: injuries.social_concerns.length,
         news_alerts: injuries.news_worthy.length,
-        intel_enabled: includeSocialIntel
+        intel_enabled: includeSocialIntel,
       },
       asOf: new Date().toISOString(),
     };
   } catch (err: any) {
     console.error('Enhanced scout error:', err);
-    return { 
+    return {
       message: err?.message || 'Enhanced scout failed',
       fallback: true,
-      error: err.name || 'Unknown'
+      error: err.name || 'Unknown',
     };
   }
 }

@@ -1,14 +1,15 @@
 // Load environment variables first
 import 'dotenv/config';
 
-import express from 'express';
 import cors from 'cors';
+import express from 'express';
+import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
-import rateLimit from 'express-rate-limit';
-import router from './routes';
+
 import { env, allowedOrigins } from './config/env';
 import { connectDatabase, getDatabaseHealth, disconnectDatabase } from './db';
+import router from './routes';
 
 const app = express();
 // Prefer platform-provided PORT (e.g., Railway), then env schema, then 3000
@@ -54,18 +55,18 @@ app.use('*', (req, res) => {
     message: `Route ${req.originalUrl} not found`,
     availableEndpoints: {
       health: '/api/health',
-      reports: '/api/reports/daily'
-    }
+      reports: '/api/reports/daily',
+    },
   });
 });
 
 // Error handling middleware
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', error);
-  
+
   res.status(error.status || 500).json({
     error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong',
   });
 });
 
@@ -75,7 +76,9 @@ async function startServer() {
   const server = app.listen(PORT, () => {
     console.log(`🚀 HeadCoach Orchestrator server running on port ${PORT}`);
     console.log(`📊 Health check available at: http://localhost:${PORT}/api/health`);
-    console.log(`📈 Environment: ${env.NODE_ENV} | Model: ${env.AI_MODEL} | Mode: ${env.EXECUTION_MODE}`);
+    console.log(
+      `📈 Environment: ${env.NODE_ENV} | Model: ${env.AI_MODEL} | Mode: ${env.EXECUTION_MODE}`
+    );
   });
 
   // Connect to database in background (non-blocking)
@@ -83,7 +86,7 @@ async function startServer() {
     try {
       console.log('🔄 Connecting to database in background...');
       await connectDatabase();
-      
+
       // Test database health
       const health = await getDatabaseHealth();
       if (health.healthy) {
@@ -100,29 +103,30 @@ async function startServer() {
   return server;
 }
 
-startServer().then(server => {
-
-  // Handle graceful shutdown
-  process.on('SIGTERM', async () => {
-    console.log('SIGTERM received, shutting down gracefully...');
-    await disconnectDatabase();
-    server.close(() => {
-      console.log('Process terminated');
-      process.exit(0);
+startServer()
+  .then((server) => {
+    // Handle graceful shutdown
+    process.on('SIGTERM', async () => {
+      console.log('SIGTERM received, shutting down gracefully...');
+      await disconnectDatabase();
+      server.close(() => {
+        console.log('Process terminated');
+        process.exit(0);
+      });
     });
-  });
 
-  process.on('SIGINT', async () => {
-    console.log('SIGINT received, shutting down gracefully...');
-    await disconnectDatabase();
-    server.close(() => {
-      console.log('Process terminated');
-      process.exit(0);
+    process.on('SIGINT', async () => {
+      console.log('SIGINT received, shutting down gracefully...');
+      await disconnectDatabase();
+      server.close(() => {
+        console.log('Process terminated');
+        process.exit(0);
+      });
     });
+  })
+  .catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
   });
-}).catch(error => {
-  console.error('Failed to start server:', error);
-  process.exit(1);
-});
 
 export default app;

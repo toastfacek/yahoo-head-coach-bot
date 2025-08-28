@@ -1,7 +1,8 @@
 // Direct Yahoo Fantasy API implementation - bypassing the problematic yahoo-fantasy library
 import axios, { AxiosInstance } from 'axios';
-import { prisma } from '../db';
+
 import { env } from '../config/env';
+import { prisma } from '../db';
 
 interface YahooToken {
   accessToken: string;
@@ -29,12 +30,12 @@ class DirectYahooClient {
       baseURL: 'https://fantasysports.yahooapis.com/fantasy/v2',
       timeout: 10000, // 10 second timeout
       headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Yahoo Fantasy HeadCoach Bot/1.0'
+        Accept: 'application/json',
+        'User-Agent': 'Yahoo Fantasy HeadCoach Bot/1.0',
       },
       params: {
-        format: 'json' // Request JSON format instead of XML
-      }
+        format: 'json', // Request JSON format instead of XML
+      },
     });
 
     // Add auth interceptor
@@ -71,16 +72,18 @@ class DirectYahooClient {
 
   private async refreshToken(): Promise<boolean> {
     try {
-      const response = await axios.post('https://api.login.yahoo.com/oauth2/get_token', 
+      const response = await axios.post(
+        'https://api.login.yahoo.com/oauth2/get_token',
         new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token: this.token.refreshToken,
           client_id: env.YAHOO_CLIENT_ID,
           client_secret: env.YAHOO_CLIENT_SECRET,
-          redirect_uri: env.YAHOO_REDIRECT_URI
-        }), {
+          redirect_uri: env.YAHOO_REDIRECT_URI,
+        }),
+        {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          timeout: 10000
+          timeout: 10000,
         }
       );
 
@@ -90,13 +93,13 @@ class DirectYahooClient {
         refreshToken: tokenData.refresh_token || this.token.refreshToken,
         expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
         tokenType: tokenData.token_type || 'Bearer',
-        scope: tokenData.scope || this.token.scope
+        scope: tokenData.scope || this.token.scope,
       };
 
       // Persist refreshed token
       await prisma.yahooToken.update({
         where: { userId: this.userId },
-        data: this.token
+        data: this.token,
       });
 
       console.log('✅ Token refreshed successfully');
@@ -117,7 +120,7 @@ class DirectYahooClient {
     }
   }
 
-  // League API  
+  // League API
   async getLeagueMeta(leagueKey: string): Promise<YahooApiResponse> {
     try {
       const response = await this.client.get(`/league/${leagueKey}`);
@@ -140,7 +143,9 @@ class DirectYahooClient {
   // Get user's leagues for a specific game
   async getUserGameLeagues(gameKey: string): Promise<YahooApiResponse> {
     try {
-      const response = await this.client.get(`/users;use_login=1/games;game_keys=${gameKey}/leagues`);
+      const response = await this.client.get(
+        `/users;use_login=1/games;game_keys=${gameKey}/leagues`
+      );
       return { data: response.data, success: true };
     } catch (error: any) {
       return { data: null, success: false, error: error.message };
@@ -185,21 +190,24 @@ class DirectYahooClient {
   }
 
   // Transaction API - Add/Drop players
-  async addDropPlayers(teamKey: string, addPlayerKey: string, dropPlayerKey?: string, fabBid?: number): Promise<YahooApiResponse> {
+  async addDropPlayers(
+    teamKey: string,
+    addPlayerKey: string,
+    dropPlayerKey?: string,
+    fabBid?: number
+  ): Promise<YahooApiResponse> {
     try {
       const transactionData: any = {
         transaction: {
           type: dropPlayerKey ? 'add_drop' : 'add',
-          players: [
-            { player_key: addPlayerKey, transaction_type: 'add' }
-          ]
-        }
+          players: [{ player_key: addPlayerKey, transaction_type: 'add' }],
+        },
       };
 
       if (dropPlayerKey) {
         transactionData.transaction.players.push({
           player_key: dropPlayerKey,
-          transaction_type: 'drop'
+          transaction_type: 'drop',
         });
       }
 
@@ -215,15 +223,18 @@ class DirectYahooClient {
   }
 
   // Roster API - Update player positions
-  async updateRosterPositions(teamKey: string, playerMoves: Array<{playerId: string, newPosition: string}>): Promise<YahooApiResponse> {
+  async updateRosterPositions(
+    teamKey: string,
+    playerMoves: Array<{ playerId: string; newPosition: string }>
+  ): Promise<YahooApiResponse> {
     try {
       const rosterData = {
         roster: {
-          players: playerMoves.map(move => ({
+          players: playerMoves.map((move) => ({
             player_key: move.playerId,
-            position: move.newPosition
-          }))
-        }
+            position: move.newPosition,
+          })),
+        },
       };
 
       const response = await this.client.put(`/team/${teamKey}/roster`, rosterData);
@@ -246,7 +257,7 @@ export async function createYahooClient(userId: string): Promise<DirectYahooClie
     refreshToken: tokenRecord.refreshToken,
     expiresAt: tokenRecord.expiresAt,
     tokenType: tokenRecord.tokenType,
-    scope: tokenRecord.scope || undefined
+    scope: tokenRecord.scope || undefined,
   };
 
   return new DirectYahooClient(token, userId);
@@ -255,28 +266,28 @@ export async function createYahooClient(userId: string): Promise<DirectYahooClie
 // Utility functions (compatible with existing interface)
 export async function yfForUser(userId: string) {
   const client = await createYahooClient(userId);
-  
+
   return {
     game: {
       meta: async (code: string) => {
         const result = await client.getGameMeta(code);
         if (!result.success) throw new Error(result.error);
         return { game_key: result.data?.game?.game_key };
-      }
+      },
     },
     league: {
       meta: async (leagueKey: string) => {
         const result = await client.getLeagueMeta(leagueKey);
         if (!result.success) throw new Error(result.error);
         return { draft_status: result.data?.league?.draft_status };
-      }
+      },
     },
     user: {
       game_teams: async (gameKey: string) => {
         const result = await client.getUserGameTeams(gameKey);
         if (!result.success) throw new Error(result.error);
         return { teams: result.data?.users?.[0]?.user?.games?.[0]?.teams || [] };
-      }
+      },
     },
     team: {
       roster: async (teamKey: string) => {
@@ -294,16 +305,16 @@ export async function yfForUser(userId: string) {
           );
           if (!result.success) throw new Error(result.error);
           return { transaction: { transaction_id: 'direct_api_' + Date.now() } };
-        }
-      })
+        },
+      }),
     },
     // Legacy compatibility methods for tests
-    setUserToken: (token: string) => {
+    setUserToken: (_token: string) => {
       // Already set during client creation, this is for test compatibility
     },
-    setRefreshToken: (token: string) => {
+    setRefreshToken: (_token: string) => {
       // Already set during client creation, this is for test compatibility
-    }
+    },
   };
 }
 
@@ -312,13 +323,13 @@ export async function getGameKey(yf: DirectYahooClient, code = 'nfl'): Promise<s
   if (!meta.success) {
     throw new Error(`Failed to get game meta: ${meta.error}`);
   }
-  
+
   // Extract game key from Yahoo's response structure
   const gameKey = meta.data?.fantasy_content?.game?.[0]?.game_key;
   if (!gameKey) {
     throw new Error('No game key found in response');
   }
-  
+
   return String(gameKey);
 }
 
@@ -326,19 +337,23 @@ export function leagueKeyFor(gameKey: string, leagueId: string | number) {
   return `${gameKey}.l.${leagueId}`;
 }
 
-export async function userTeamKey(yf: DirectYahooClient, gameKey: string, leagueKey: string): Promise<string | null> {
+export async function userTeamKey(
+  yf: DirectYahooClient,
+  gameKey: string,
+  leagueKey: string
+): Promise<string | null> {
   try {
     // First try to get teams directly from the league
     const leagueTeams = await yf.getLeagueTeams(leagueKey);
     if (leagueTeams.success && leagueTeams.data?.fantasy_content?.league?.[1]?.teams) {
       const teamsData = leagueTeams.data.fantasy_content.league[1].teams;
-      
+
       // Find our team by checking ownership
       // Teams data is structured as an object with numeric keys
       for (const key in teamsData) {
         if (teamsData[key]?.team) {
           const teamArray = teamsData[key].team[0]; // team[0] contains the team data array
-          
+
           // Look for is_owned_by_current_login flag
           for (let i = 0; i < teamArray.length; i++) {
             if (teamArray[i]?.is_owned_by_current_login === 1) {
@@ -349,16 +364,16 @@ export async function userTeamKey(yf: DirectYahooClient, gameKey: string, league
         }
       }
     }
-    
+
     // Fallback: try the user game teams approach
     const user = await yf.getUserGameTeams(gameKey);
     if (!user.success) {
       return null;
     }
-    
+
     // Check if teams is an object instead of array
     let teamsData = user.data?.fantasy_content?.users?.[0]?.user?.[1]?.games?.[0]?.game?.[1]?.teams;
-    
+
     if (teamsData && typeof teamsData === 'object') {
       // If it's an object, convert to array
       if (Array.isArray(teamsData)) {
@@ -373,7 +388,7 @@ export async function userTeamKey(yf: DirectYahooClient, gameKey: string, league
         }
       }
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error finding user team key:', error);
@@ -381,13 +396,16 @@ export async function userTeamKey(yf: DirectYahooClient, gameKey: string, league
   }
 }
 
-export async function isLeaguePostDraft(yf: DirectYahooClient, leagueKey: string): Promise<boolean> {
+export async function isLeaguePostDraft(
+  yf: DirectYahooClient,
+  leagueKey: string
+): Promise<boolean> {
   try {
     const meta = await yf.getLeagueMeta(leagueKey);
     if (!meta.success) {
       return false; // Assume not post-draft if we can't check
     }
-    
+
     const draftStatus = meta.data?.fantasy_content?.league?.[0]?.draft_status || '';
     const status = String(draftStatus).toLowerCase();
     return status === 'postdraft' || status.includes('completed') || status.includes('finished');
@@ -404,9 +422,9 @@ export async function stageActions(leagueId: string, actions: any[]) {
 
 export async function callYahoo(action: any) {
   console.log('🔌 Direct Yahoo API call:', action);
-  
+
   const { leagueKey, teamKey, action: actionData, yf } = action;
-  
+
   if (!leagueKey || !teamKey || !actionData) {
     return { success: false, reason: 'MISSING_REQUIRED_PARAMS' };
   }
@@ -423,88 +441,92 @@ export async function callYahoo(action: any) {
         if (!actionData.addPlayerId) {
           return { success: false, reason: 'MISSING_ADD_PLAYER_ID' };
         }
-        
+
         // Determine the transaction type based on what players are involved
         const transactionType = actionData.dropPlayerId ? 'add_drop' : 'add';
-        
+
         const transactionRequest: any = {
           type: transactionType,
           players: [
-            ...(actionData.addPlayerId ? [{ player_key: actionData.addPlayerId, transaction_type: 'add' }] : []),
-            ...(actionData.dropPlayerId ? [{ player_key: actionData.dropPlayerId, transaction_type: 'drop' }] : [])
-          ]
+            ...(actionData.addPlayerId
+              ? [{ player_key: actionData.addPlayerId, transaction_type: 'add' }]
+              : []),
+            ...(actionData.dropPlayerId
+              ? [{ player_key: actionData.dropPlayerId, transaction_type: 'drop' }]
+              : []),
+          ],
         };
-        
+
         // Only include faab_bid if it's greater than 0
         if (actionData.fabBid && actionData.fabBid > 0) {
           transactionRequest.faab_bid = actionData.fabBid;
         }
-        
+
         const result = await yf.team.transactions().add(transactionRequest);
-        
+
         if (!result || !result.transaction || !result.transaction.transaction_id) {
           return { success: false, reason: 'TRANSACTION_FAILED' };
         }
-        
-        return { 
-          success: true, 
+
+        return {
+          success: true,
           transactionId: result.transaction.transaction_id,
-          details: result.transaction 
+          details: result.transaction,
         };
-      
+
       case 'LINEUP_SWAP':
         // Check for missing required fields for lineup swap
         if (!actionData.playerMoves || actionData.playerMoves.length === 0) {
           return { success: false, reason: 'MISSING_PLAYER_MOVES' };
         }
-        
+
         // Convert playerMoves to the format expected by Yahoo API
         const rosterMoves = actionData.playerMoves.map((move: any) => ({
           player_key: move.playerId,
-          position: move.newPosition
+          position: move.newPosition,
         }));
-        
+
         const rosterResult = await yf.team.roster().edit({
-          roster_moves: rosterMoves
+          roster_moves: rosterMoves,
         });
-        
+
         if (!rosterResult || !rosterResult.roster) {
           return { success: false, reason: 'LINEUP_UPDATE_FAILED' };
         }
-        
+
         return {
           success: true,
-          updatedRoster: rosterResult.roster
+          updatedRoster: rosterResult.roster,
         };
-      
+
       default:
         return { success: false, reason: 'UNSUPPORTED_ACTION_TYPE' };
     }
   } catch (error: any) {
     console.error('Direct Yahoo API error:', error);
-    
+
     // Map specific errors to expected error codes
     if (error.message?.includes('transaction') || error.message?.includes('Transaction')) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         reason: 'TRANSACTION_FAILED',
-        error: error.message 
+        error: error.message,
       };
     }
-    
+
     if (error.message?.includes('Yahoo API Error') || actionData.type === 'WAIVER') {
-      return { 
-        success: false, 
+      return {
+        success: false,
         reason: 'WAIVER_EXECUTION_ERROR',
-        error: error.message 
+        error: error.message,
       };
     }
-    
+
     // Generic fallback
-    return { 
-      success: false, 
+    return {
+      success: false,
       reason: 'YAHOO_API_ERROR',
-      error: error.message 
+      error: error.message,
     };
   }
 }
