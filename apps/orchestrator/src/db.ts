@@ -82,7 +82,7 @@ class DatabaseManager {
     return this._prisma;
   }
 
-  // Health check method
+  // Health check method with timeout to prevent hanging
   async healthCheck(): Promise<{ healthy: boolean; latency?: number; error?: string }> {
     if (!this._prisma) {
       return { healthy: false, error: 'Not connected' };
@@ -90,7 +90,18 @@ class DatabaseManager {
 
     try {
       const start = Date.now();
-      await this._prisma.$queryRaw`SELECT 1`;
+      
+      // Create timeout promise (5 seconds)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Health check timeout after 5s')), 5000);
+      });
+      
+      // Race the query against timeout
+      await Promise.race([
+        this._prisma.$queryRaw`SELECT 1`,
+        timeoutPromise
+      ]);
+      
       const latency = Date.now() - start;
       return { healthy: true, latency };
     } catch (error: any) {
