@@ -1,0 +1,222 @@
+import axios, { AxiosInstance } from 'axios';
+import { env } from '../utils/config';
+import { apiLogger } from '../utils/logger';
+import { OrchestratorResponse, FantasyReportData } from '../types/discord';
+
+export class OrchestratorApiService {
+  private api: AxiosInstance;
+
+  constructor() {
+    this.api = axios.create({
+      baseURL: env.ORCHESTRATOR_URL + '/api',
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Yahoo-Fantasy-Discord-Bot/1.0.0'
+      }
+    });
+
+    this.api.interceptors.request.use(
+      (config) => {
+        apiLogger.debug({ url: config.url, method: config.method }, 'API request');
+        return config;
+      }
+    );
+
+    this.api.interceptors.response.use(
+      (response) => {
+        apiLogger.debug({ status: response.status, url: response.config.url }, 'API response');
+        return response;
+      },
+      (error) => {
+        apiLogger.error({ 
+          error: error.message, 
+          status: error.response?.status,
+          url: error.config?.url 
+        }, 'API error');
+        throw error;
+      }
+    );
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      const response = await this.api.get('/health');
+      return response.status === 200;
+    } catch (error) {
+      apiLogger.error(error, 'Health check failed');
+      return false;
+    }
+  }
+
+  async getOAuthUrl(userId: string): Promise<string> {
+    try {
+      const response = await this.api.get(`/oauth/start?userId=${userId}`);
+      // The orchestrator should return redirect URL or auth URL
+      return response.request.res.responseUrl || response.data.authUrl;
+    } catch (error) {
+      apiLogger.error({ error, userId }, 'Failed to get OAuth URL');
+      throw new Error('Failed to generate authentication URL');
+    }
+  }
+
+  async checkOAuthStatus(userId: string): Promise<{ authenticated: boolean; userInfo?: any }> {
+    try {
+      const response = await this.api.get(`/oauth/status?userId=${userId}`);
+      return response.data;
+    } catch (error) {
+      apiLogger.error({ error, userId }, 'Failed to check OAuth status');
+      return { authenticated: false };
+    }
+  }
+
+  async getUserLeagues(userId: string): Promise<any[]> {
+    try {
+      const response = await this.api.get(`/leagues?userId=${userId}`);
+      return response.data.leagues || [];
+    } catch (error) {
+      apiLogger.error({ error, userId }, 'Failed to get user leagues');
+      throw new Error('Failed to retrieve leagues');
+    }
+  }
+
+  async getDailyReport(userId: string, leagueId: string): Promise<AsyncIterable<string>> {
+    try {
+      const response = await this.api.get(`/reports/daily?userId=${userId}&leagueId=${leagueId}`, {
+        responseType: 'stream',
+        headers: {
+          'Accept': 'text/event-stream'
+        }
+      });
+
+      return this.parseServerSentEvents(response.data);
+    } catch (error) {
+      apiLogger.error({ error, userId, leagueId }, 'Failed to get daily report');
+      throw new Error('Failed to generate daily report');
+    }
+  }
+
+  async checkLineup(userId: string, leagueId: string): Promise<FantasyReportData> {
+    try {
+      const response = await this.api.post('/lineup/check', {
+        userId,
+        leagueId
+      });
+      
+      return this.parseFantasyReport(response.data);
+    } catch (error) {
+      apiLogger.error({ error, userId, leagueId }, 'Failed to check lineup');
+      throw new Error('Failed to analyze lineup');
+    }
+  }
+
+  async analyzeWaivers(userId: string, leagueId: string): Promise<FantasyReportData> {
+    try {
+      const response = await this.api.post('/waivers/run', {
+        userId,
+        leagueId
+      });
+      
+      return this.parseFantasyReport(response.data);
+    } catch (error) {
+      apiLogger.error({ error, userId, leagueId }, 'Failed to analyze waivers');
+      throw new Error('Failed to analyze waiver wire');
+    }
+  }
+
+  async getPendingApprovals(userId: string, leagueId: string): Promise<any[]> {
+    try {
+      const response = await this.api.get(`/approvals/pending?userId=${userId}&leagueId=${leagueId}`);
+      return response.data.pending || [];
+    } catch (error) {
+      apiLogger.error({ error, userId, leagueId }, 'Failed to get pending approvals');
+      throw new Error('Failed to retrieve pending approvals');
+    }
+  }
+
+  async approveRecommendation(userId: string, recommendationId: string): Promise<boolean> {
+    try {
+      const response = await this.api.post('/approvals/approve', {
+        userId,
+        recommendationId
+      });
+      return response.data.success === true;
+    } catch (error) {
+      apiLogger.error({ error, userId, recommendationId }, 'Failed to approve recommendation');
+      throw new Error('Failed to approve recommendation');
+    }
+  }
+
+  async rejectRecommendation(userId: string, recommendationId: string): Promise<boolean> {
+    try {
+      const response = await this.api.post('/approvals/reject', {
+        userId,
+        recommendationId
+      });
+      return response.data.success === true;
+    } catch (error) {
+      apiLogger.error({ error, userId, recommendationId }, 'Failed to reject recommendation');
+      throw new Error('Failed to reject recommendation');
+    }
+  }
+
+  async sendChatMessage(userId: string, message: string, leagueId?: string): Promise<AsyncIterable<string>> {
+    try {
+      const response = await this.api.post('/chat', {
+        userId,
+        message,
+        leagueId
+      }, {
+        responseType: 'stream',
+        headers: {
+          'Accept': 'text/event-stream'
+        }
+      });
+
+      return this.parseServerSentEvents(response.data);
+    } catch (error) {
+      apiLogger.error({ error, userId, message }, 'Failed to send chat message');
+      throw new Error('Failed to process your message');
+    }
+  }
+
+  private async* parseServerSentEvents(stream: any): AsyncIterable<string> {
+    let buffer = '';
+    
+    for await (const chunk of stream) {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') {
+            return;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.content) {
+              yield parsed.content;
+            }
+          } catch {
+            // Skip malformed JSON
+            yield data;
+          }
+        }
+      }
+    }
+  }
+
+  private parseFantasyReport(data: any): FantasyReportData {
+    // Parse the response from orchestrator into standardized format
+    return {
+      summary: data.summary || [],
+      lineup: data.lineup || [],
+      waivers: data.waivers || [],
+      notes: data.notes || []
+    };
+  }
+}
+
+export const orchestratorApi = new OrchestratorApiService();

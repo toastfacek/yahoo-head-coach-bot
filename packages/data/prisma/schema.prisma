@@ -1,18 +1,19 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model User {
-  id         String      @id @default(cuid())
-  email      String?     @unique
-  yahooToken YahooToken?
+  id         String        @id @default(cuid())
+  email      String?       @unique
+  createdAt  DateTime      @default(now())
   leagues    LeagueUser[]
-  createdAt  DateTime    @default(now())
+  yahooToken YahooToken?
+  discordUser DiscordUser?
 }
 
 model YahooToken {
@@ -22,18 +23,18 @@ model YahooToken {
   expiresAt    DateTime
   tokenType    String
   scope        String?
-  user         User     @relation(fields: [userId], references: [id])
   updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
 }
 
 model League {
-  id         String   @id
-  name       String
-  sport      String
-  season     Int
-  teams      Team[]
-  members    LeagueUser[]
-  snapshots  LeagueSnapshot[]
+  id        String           @id
+  name      String
+  sport     String
+  season    Int
+  snapshots LeagueSnapshot[]
+  members   LeagueUser[]
+  teams     Team[]
 }
 
 model LeagueUser {
@@ -43,6 +44,7 @@ model LeagueUser {
   role     String
   league   League @relation(fields: [leagueId], references: [id])
   user     User   @relation(fields: [userId], references: [id])
+
   @@unique([leagueId, userId])
 }
 
@@ -52,13 +54,13 @@ model Team {
   name         String
   fabRemaining Int
   rosterJson   Json
-  league       League @relation(fields:[leagueId], references:[id])
+  league       League @relation(fields: [leagueId], references: [id])
 }
 
 model Signal {
   id       String   @id @default(cuid())
   leagueId String
-  kind     String   // injury | news | sentiment | vegas | weather
+  kind     String
   payload  Json
   asOf     DateTime @default(now())
   source   String
@@ -67,25 +69,25 @@ model Signal {
 model Recommendation {
   id              String    @id @default(cuid())
   leagueId        String
-  type            String    // LINEUP_SWAP | WAIVER
+  type            String
   summary         String
   payload         Json
   confidence      Float
   fabBid          Int?
   autoEligible    Boolean   @default(false)
-  status          String    @default("STAGED") // STAGED|EXECUTED|REJECTED
+  status          String    @default("STAGED")
   createdAt       DateTime  @default(now())
   executedAt      DateTime?
   executionResult Json?
 }
 
 model Decision {
-  id                String   @id @default(cuid())
-  recommendationId  String
-  action            String   // APPROVE|REJECT|AUTO_EXECUTE
-  actorUserId       String?
-  executedAt        DateTime?
-  result            Json?
+  id               String    @id @default(cuid())
+  recommendationId String
+  action           String
+  actorUserId      String?
+  executedAt       DateTime?
+  result           Json?
 }
 
 model LeagueSnapshot {
@@ -95,6 +97,17 @@ model LeagueSnapshot {
   rosterJson Json
   createdAt  DateTime @default(now())
   league     League   @relation(fields: [leagueId], references: [id])
+}
+
+model DiscordUser {
+  id              String   @id @default(cuid())
+  discordId       String   @unique
+  discordUsername String
+  userId          String?  @unique
+  isAuthenticated Boolean  @default(false)
+  user            User?    @relation(fields: [userId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model CostLog {
