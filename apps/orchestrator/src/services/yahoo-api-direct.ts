@@ -427,14 +427,25 @@ export async function callYahoo(action: any) {
         // Determine the transaction type based on what players are involved
         const transactionType = actionData.dropPlayerId ? 'add_drop' : 'add';
         
-        const result = await yf.team.transactions().add({
+        const transactionRequest: any = {
           type: transactionType,
           players: [
             ...(actionData.addPlayerId ? [{ player_key: actionData.addPlayerId, transaction_type: 'add' }] : []),
             ...(actionData.dropPlayerId ? [{ player_key: actionData.dropPlayerId, transaction_type: 'drop' }] : [])
-          ],
-          faab_bid: actionData.fabBid || 0
-        });
+          ]
+        };
+        
+        // Only include faab_bid if it's greater than 0
+        if (actionData.fabBid && actionData.fabBid > 0) {
+          transactionRequest.faab_bid = actionData.fabBid;
+        }
+        
+        const result = await yf.team.transactions().add(transactionRequest);
+        
+        if (!result || !result.transaction || !result.transaction.transaction_id) {
+          return { success: false, reason: 'TRANSACTION_FAILED' };
+        }
+        
         return { 
           success: true, 
           transactionId: result.transaction.transaction_id,
@@ -456,6 +467,10 @@ export async function callYahoo(action: any) {
         const rosterResult = await yf.team.roster().edit({
           roster_moves: rosterMoves
         });
+        
+        if (!rosterResult || !rosterResult.roster) {
+          return { success: false, reason: 'LINEUP_UPDATE_FAILED' };
+        }
         
         return {
           success: true,
