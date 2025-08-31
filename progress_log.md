@@ -35,3 +35,24 @@
 ## Next Actions (this change set)
 - Implement items 1–4 above and verify locally with lint/format.
 
+## Update — 2025-08-29
+### Completed
+- Linked Discord users on OAuth callback; `/oauth/status` returns `{ authenticated, userInfo }`.
+- Added `GET /api/leagues?userId=...` (NFL) and wired router.
+- Aligned contracts:
+  - `/lineup/check`, `/waivers/run` return `FantasyReportData` shape.
+  - Approvals list normalized; approve/reject return `{ success: true, ok: true }`.
+  - Execution failures now return consistent error objects; missing-parameter reasons mapped to HTTP 400.
+- Fixed Yahoo execution paths for `WAIVER` (include `teamKey`) and `LINEUP_SWAP` (implemented `roster().edit`).
+- Ran Prettier/ESLint and pushed branch. All orchestrator tests passing (8 files, 112 tests).
+
+### Next Actions
+- Run end-to-end Discord smoke: `/auth login` → callback → `/auth status` → `/lineup` → `/waivers` → `/approvals` approve.
+- Set `EXECUTION_MODE=live` in production after validation; monitor first executions.
+- Improve agent output to populate structured `lineup`/`waivers` arrays (not only summary text); consider typed tool outputs.
+- Persist preferred league per Discord user and cache leagues to reduce Yahoo calls.
+- Harden DB startup (lazy-connect or queue) to avoid early request failures; consider retries.
+- Observability: enrich logs with request IDs and add error telemetry/metrics.
+- Security: move OAuth `stateStore` to Redis/DB; review CORS/headers.
+- CI: add smoke tests for `/leagues` and approvals route; consider minimal discord-bot tests.
+- Docs: add curl smoke scripts and update README with Discord + OAuth flow.

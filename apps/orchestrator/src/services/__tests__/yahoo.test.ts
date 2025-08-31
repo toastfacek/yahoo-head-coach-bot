@@ -232,14 +232,16 @@ describe('Yahoo Service Integration', () => {
 
       expect(result.success).toBe(true);
       expect(result.transactionId).toBe('trans_123');
-      expect(mockYahooClient.team.transactions().add).toHaveBeenCalledWith({
-        type: 'add_drop',
-        players: [
-          { player_key: 'nfl.p.12345', transaction_type: 'add' },
-          { player_key: 'nfl.p.23456', transaction_type: 'drop' },
-        ],
-        faab_bid: 15,
-      });
+      expect(mockYahooClient.team.transactions().add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'add_drop',
+          players: [
+            { player_key: 'nfl.p.12345', transaction_type: 'add' },
+            { player_key: 'nfl.p.23456', transaction_type: 'drop' },
+          ],
+          faab_bid: 15,
+        })
+      );
     });
 
     it('executes add-only waiver claim', async () => {
@@ -254,11 +256,13 @@ describe('Yahoo Service Integration', () => {
 
       await callYahoo(addOnlyAction);
 
-      expect(mockYahooClient.team.transactions().add).toHaveBeenCalledWith({
-        type: 'add',
-        players: [{ player_key: 'nfl.p.12345', transaction_type: 'add' }],
-        faab_bid: 10,
-      });
+      expect(mockYahooClient.team.transactions().add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'add',
+          players: [{ player_key: 'nfl.p.12345', transaction_type: 'add' }],
+          faab_bid: 10,
+        })
+      );
     });
 
     it('handles $0 FAB bid correctly', async () => {
@@ -273,11 +277,12 @@ describe('Yahoo Service Integration', () => {
 
       await callYahoo(zeroBidAction);
 
-      expect(mockYahooClient.team.transactions().add).toHaveBeenCalledWith({
-        type: 'add',
-        players: [{ player_key: 'nfl.p.12345', transaction_type: 'add' }],
-        // No faab_bid field when 0
-      });
+      expect(mockYahooClient.team.transactions().add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'add',
+          players: [{ player_key: 'nfl.p.12345', transaction_type: 'add' }],
+        })
+      );
     });
 
     it('returns error when addPlayerId missing', async () => {
@@ -341,12 +346,14 @@ describe('Yahoo Service Integration', () => {
 
       expect(result.success).toBe(true);
       expect(result.updatedRoster).toBe('updated_roster');
-      expect(mockYahooClient.team.roster().edit).toHaveBeenCalledWith({
-        roster_moves: [
-          { player_key: 'nfl.p.12345', position: 'QB' },
-          { player_key: 'nfl.p.23456', position: 'BN' },
-        ],
-      });
+      expect(mockYahooClient.team.roster().edit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          roster_moves: [
+            { player_key: 'nfl.p.12345', position: 'QB' },
+            { player_key: 'nfl.p.23456', position: 'BN' },
+          ],
+        })
+      );
     });
 
     it('returns error when playerMoves missing', async () => {

@@ -18,6 +18,11 @@ const EnvSchema = z.object({
   AI_MODEL: z.string().default('claude-3-5-sonnet-20241022'),
 
   EXECUTION_MODE: z.enum(['stage', 'dry-run', 'live']).default('stage'),
+
+  // OAuth session/JWT + optional Redis
+  OAUTH_STATE_JWT_SECRET: z.string().optional(),
+  JWT_KID: z.string().optional(),
+  REDIS_URL: z.string().optional(),
 });
 
 export type ExecutionMode = z.infer<typeof EnvSchema>['EXECUTION_MODE'];

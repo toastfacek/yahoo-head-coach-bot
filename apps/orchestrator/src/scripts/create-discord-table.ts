@@ -32,10 +32,22 @@ async function createDiscordUserTable() {
     `;
 
     // Add foreign key constraint
+    // Add FK constraint if it doesn't already exist (IF NOT EXISTS is not supported here)
     await prisma.$executeRaw`
-      ALTER TABLE "DiscordUser" 
-      ADD CONSTRAINT IF NOT EXISTS "DiscordUser_userId_fkey" 
-      FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint c
+          JOIN pg_class t ON t.oid = c.conrelid
+          WHERE c.conname = 'DiscordUser_userId_fkey'
+            AND t.relname = 'DiscordUser'
+        ) THEN
+          ALTER TABLE "DiscordUser"
+          ADD CONSTRAINT "DiscordUser_userId_fkey"
+          FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+        END IF;
+      END $$;
     `;
 
     console.log('✅ DiscordUser table created successfully!');

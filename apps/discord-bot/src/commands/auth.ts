@@ -1,8 +1,9 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { BotCommand } from '../types/discord';
 import { orchestratorApi } from '../services/orchestratorApi';
 import { userService } from '../services/userService';
 import { authLogger } from '../utils/logger';
+import { env } from '../utils/config';
 
 export const authCommand: BotCommand = {
   data: new SlashCommandBuilder()
@@ -25,87 +26,102 @@ export const authCommand: BotCommand = {
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
+    const executionId = Math.random().toString(36).substring(7);
     const subcommand = interaction.options.getSubcommand();
     const discordId = interaction.user.id;
     const discordUsername = interaction.user.username;
 
-    try {
-      // Ensure user exists in our system
-      await userService.createOrUpdateUser(discordId, discordUsername);
+    authLogger.info({ discordId, executionId, subcommand, interactionId: interaction.id }, 'ULTRATHINK: Auth command execute started');
 
+    try {
+      // Route by subcommand; each handler will safely ack/edit
       switch (subcommand) {
         case 'login':
-          await handleLogin(interaction, discordId);
+          await handleLogin(interaction, discordId, discordUsername);
           break;
         case 'status':
-          await handleStatus(interaction, discordId);
+          await handleStatus(interaction, discordId, discordUsername);
           break;
         case 'logout':
-          await handleLogout(interaction, discordId);
+          await handleLogout(interaction, discordId, discordUsername);
           break;
         default:
           await interaction.reply({
             content: 'Unknown auth command. Use `/auth login`, `/auth status`, or `/auth logout`.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral,
           });
       }
     } catch (error) {
       authLogger.error({ error, discordId, subcommand }, 'Auth command error');
-      await interaction.reply({
-        content: 'An error occurred while processing your authentication request.',
-        ephemeral: true
-      });
+      try {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ content: 'An error occurred while processing your authentication request.' });
+        } else {
+          await interaction.reply({ content: 'An error occurred while processing your authentication request.', flags: MessageFlags.Ephemeral });
+        }
+      } catch (replyError) {
+        authLogger.error({ replyError, discordId, subcommand }, 'Failed to send error response');
+      }
     }
   },
 };
 
-async function handleLogin(interaction: ChatInputCommandInteraction, discordId: string) {
+async function handleLogin(
+  interaction: ChatInputCommandInteraction,
+  discordId: string,
+  discordUsername: string
+) {
   try {
-    // Check if already authenticated
-    const isAuth = await userService.isAuthenticated(discordId);
-    if (isAuth) {
-      await interaction.reply({
-        content: '✅ You are already authenticated with Yahoo Fantasy Football.',
-        ephemeral: true
-      });
-      return;
+    const authUrl = await orchestratorApi.createOAuthSession(discordId);
+    const embed = new EmbedBuilder()
+      .setTitle('Connect Yahoo Fantasy Football')
+      .setDescription('Authorize the bot to access your Yahoo Fantasy data. You can revoke access at any time in Yahoo settings.')
+      .setColor(0x430297);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setLabel('Authorize with Yahoo').setStyle(ButtonStyle.Link).setURL(authUrl),
+      new ButtonBuilder().setCustomId('auth:status').setLabel('Check Status').setStyle(ButtonStyle.Secondary)
+    );
+
+    const payload = { embeds: [embed], components: [row] } as const;
+
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+    } else if (interaction.deferred) {
+      await interaction.editReply(payload as any);
+    } else {
+      await interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
     }
 
-    // Get OAuth URL from orchestrator
-    const authUrl = await orchestratorApi.getOAuthUrl(discordId);
-
-    const embed = new EmbedBuilder()
-      .setTitle('🔐 Yahoo Fantasy Football Authentication')
-      .setDescription(
-        'Click the link below to connect your Yahoo Fantasy Football account:\n\n' +
-        `[**Authenticate with Yahoo**](${authUrl})\n\n` +
-        '**Important:**\n' +
-        '• This link will redirect you to Yahoo to authorize the bot\n' +
-        '• After authorization, you\'ll be redirected back and your account will be linked\n' +
-        '• Use `/auth status` to check if authentication was successful'
-      )
-      .setColor(0x430297)
-      .setFooter({
-        text: 'Your privacy is protected - we only access your fantasy football data'
-      });
-
-    await interaction.reply({
-      embeds: [embed],
-      ephemeral: true
-    });
-
-    authLogger.info({ discordId, authUrl }, 'Provided OAuth URL to user');
+    // Background user sync (no additional messages)
+    userService
+      .createOrUpdateUser(discordId, discordUsername)
+      .catch((err) => authLogger.warn({ err, discordId }, 'User upsert failed post-link display'));
   } catch (error) {
     authLogger.error({ error, discordId }, 'Failed to generate auth URL');
-    await interaction.reply({
-      content: '❌ Failed to generate authentication link. Please try again later.',
-      ephemeral: true
-    });
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction
+        .reply({
+          content: '❌ Failed to generate authentication link. Please try again later.',
+          flags: MessageFlags.Ephemeral,
+        })
+        .catch(() => {});
+    }
   }
 }
 
-async function handleStatus(interaction: ChatInputCommandInteraction, discordId: string) {
+async function handleStatus(interaction: ChatInputCommandInteraction, discordId: string, discordUsername: string) {
   try {
+    // Safely ack
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+
+    // Ensure user exists in our system (happens quickly in background)
+    userService.createOrUpdateUser(discordId, discordUsername).catch(error => {
+      authLogger.warn({ error, discordId }, 'User creation failed but continuing with status check');
+    });
+
     const user = await userService.getUser(discordId);
     const isAuth = await userService.isAuthenticated(discordId);
 
@@ -146,28 +162,37 @@ async function handleStatus(interaction: ChatInputCommandInteraction, discordId:
       .setDescription(statusDescription)
       .setColor(statusColor);
 
-    await interaction.reply({
-      embeds: [embed],
-      ephemeral: true
-    });
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ embeds: [embed] });
+    } else {
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    }
   } catch (error) {
     authLogger.error({ error, discordId }, 'Failed to check auth status');
-    await interaction.reply({
-      content: '❌ Failed to check authentication status. Please try again.',
-      ephemeral: true
-    });
+    throw error; // Let main handler deal with responses
   }
 }
 
-async function handleLogout(interaction: ChatInputCommandInteraction, discordId: string) {
+async function handleLogout(interaction: ChatInputCommandInteraction, discordId: string, discordUsername: string) {
   try {
+    // Safely ack
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+
+    // Ensure user exists in our system (happens quickly in background)
+    userService.createOrUpdateUser(discordId, discordUsername).catch(error => {
+      authLogger.warn({ error, discordId }, 'User creation failed but continuing with logout');
+    });
+
     const isAuth = await userService.isAuthenticated(discordId);
     
     if (!isAuth) {
-      await interaction.reply({
-        content: 'ℹ️ You are not currently authenticated with Yahoo Fantasy Football.',
-        ephemeral: true
-      });
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: 'ℹ️ You are not currently authenticated with Yahoo Fantasy Football.' });
+      } else {
+        await interaction.reply({ content: 'ℹ️ You are not currently authenticated with Yahoo Fantasy Football.', flags: MessageFlags.Ephemeral });
+      }
       return;
     }
 
@@ -183,17 +208,15 @@ async function handleLogout(interaction: ChatInputCommandInteraction, discordId:
       )
       .setColor(0x808080);
 
-    await interaction.reply({
-      embeds: [embed],
-      ephemeral: true
-    });
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ embeds: [embed] });
+    } else {
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    }
 
     authLogger.info({ discordId }, 'User disconnected Yahoo account');
   } catch (error) {
     authLogger.error({ error, discordId }, 'Failed to logout user');
-    await interaction.reply({
-      content: '❌ Failed to disconnect your account. Please try again.',
-      ephemeral: true
-    });
+    throw error; // Let main handler deal with responses
   }
 }

@@ -1,71 +1,55 @@
-import crypto from 'crypto';
-
 import axios from 'axios';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { prisma } from '../db';
+import { env } from '../config/env';
+import { verifyJWT } from '../utils/jwt';
+import { stateStore } from '../services/stateStore';
 
 // Use shared Prisma client
-
-// In-memory state storage for CSRF protection (in production, use Redis or database)
-const stateStore = new Map<string, { timestamp: number; userId?: string }>();
-
-// Cleanup old states every hour
-setInterval(
-  () => {
-    const now = Date.now();
-    const oneHour = 60 * 60 * 1000;
-
-    for (const [state, data] of stateStore.entries()) {
-      if (now - data.timestamp > oneHour) {
-        stateStore.delete(state);
-      }
-    }
-  },
-  60 * 60 * 1000
-);
 
 /**
  * Start OAuth flow - redirect user to Yahoo authorization server
  */
 export async function oauthStart(req: Request, res: Response): Promise<void> {
   try {
-    const Query = z.object({ userId: z.string().optional() });
+    const Query = z.object({ state: z.string() });
     const parsed = Query.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
       return;
     }
-    const { userId } = parsed.data;
+    const { state } = parsed.data as any;
 
-    // Generate secure state parameter for CSRF protection
-    const state = crypto.randomBytes(32).toString('hex');
+    // Validate signed state if provided; otherwise allow legacy userId in dev only
+    let ensuredUserId: string | null = null;
+    try {
+      const secret = env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+      const payload = verifyJWT<any>(String(state), secret);
+      if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
+      if (!payload.jti) throw new Error('Missing jti');
+      const rec = await stateStore.consume(payload.jti);
+      if (!rec) throw new Error('Invalid or consumed state');
+      ensuredUserId = String(rec.discordId || payload.sub || 'dev');
+    } catch (e) {
+      res.status(400).send('<h2>❌ Invalid Authorization Request</h2><p>Invalid or expired state parameter</p>');
+      return;
+    }
 
-    // Store state with timestamp for validation
-    stateStore.set(state, {
-      timestamp: Date.now(),
-      userId: (userId as string) || 'dev', // Default to 'dev' user for MVP
-    });
-
-    // Build Yahoo OAuth authorization URL
     const authUrl = new URL('https://api.login.yahoo.com/oauth2/request_auth');
     authUrl.searchParams.append('client_id', process.env.YAHOO_CLIENT_ID!);
     authUrl.searchParams.append('redirect_uri', process.env.YAHOO_REDIRECT_URI!);
     authUrl.searchParams.append('response_type', 'code');
-    authUrl.searchParams.append('scope', 'fspt-w'); // Fantasy Sports Read/Write
-    authUrl.searchParams.append('state', state);
+    authUrl.searchParams.append('scope', 'fspt-w');
+    // Pass through the signed state as received
+    authUrl.searchParams.append('state', String(state));
 
     console.log('Redirecting to Yahoo OAuth:', authUrl.toString());
-
-    // Redirect user to Yahoo authorization page
     res.redirect(authUrl.toString());
   } catch (error) {
     console.error('OAuth start error:', error);
-    res.status(500).json({
-      error: 'OAuth initialization failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
+    res.status(500).json({ error: 'OAuth initialization failed', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 }
 
@@ -108,8 +92,16 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     }
 
     // Validate state parameter (CSRF protection)
-    const stateData = stateStore.get(state as string);
-    if (!stateData) {
+    let ensuredUserId: string | null = null;
+    try {
+      const secret = env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+      const payload = verifyJWT<any>(String(state), secret);
+      if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
+      if (!payload.jti) throw new Error('Missing jti');
+      const rec = await stateStore.consume(payload.jti);
+      if (!rec) throw new Error('Invalid or consumed state');
+      ensuredUserId = String(rec.discordId || payload.sub || 'dev');
+    } catch (e) {
       res.status(400).send(`
         <h2>❌ Invalid Authorization Request</h2>
         <p>Invalid or expired state parameter</p>
@@ -118,14 +110,11 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Remove used state
-    stateStore.delete(state as string);
-
     // Exchange authorization code for access token
     const tokenResponse = await exchangeCodeForTokens(code as string);
 
     // Create or find user
-    const userId = stateData.userId || 'dev';
+    const userId = ensuredUserId || 'dev';
     let user = await prisma.user.findUnique({
       where: { id: userId },
     });

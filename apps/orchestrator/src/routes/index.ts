@@ -4,9 +4,9 @@ import { listPending, approve, reject } from './approvals';
 import { handleChat } from './chat';
 import { healthCheck } from './health';
 import { getUserLeagues } from './leagues';
-import { getUserLeagues } from './leagues';
 import { checkLineup } from './lineup';
 import { oauthStart, oauthCallback, tokenStatus, refreshNow } from './oauth';
+import { createOAuthSession } from './oauth-session';
 import { dailyReport } from './reports';
 import { hourly } from './scheduler';
 import { runWaivers } from './waivers';
@@ -22,6 +22,7 @@ router.get('/oauth/start', oauthStart);
 router.get('/oauth/callback', oauthCallback);
 router.get('/oauth/status', tokenStatus);
 router.get('/oauth/refresh', refreshNow);
+router.post('/oauth/session', createOAuthSession);
 
 // Reports endpoints
 router.get('/reports/daily', dailyReport);
@@ -54,6 +55,7 @@ router.get('/', (req, res) => {
       oauth: {
         start: '/oauth/start',
         callback: '/oauth/callback',
+        session: '/oauth/session',
       },
       reports: '/reports/daily',
       lineup: '/lineup/check',

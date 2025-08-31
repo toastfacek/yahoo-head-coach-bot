@@ -65,7 +65,7 @@ async function initializeBot() {
 
 function registerEventHandlers() {
   // Ready event
-  client.once('ready', async () => {
+  client.once('clientReady', async () => {
     if (!client.user) return;
     
     discordLogger.info({
@@ -83,8 +83,8 @@ function registerEventHandlers() {
       }],
     });
 
-    // Register slash commands globally
-    await registerSlashCommands();
+    // Commands are registered separately via deploy-commands script
+    discordLogger.info('Bot ready - commands should be deployed via deploy-commands script');
 
     // Initialize scheduler for proactive notifications
     const scheduler = initializeScheduler(client);
@@ -124,24 +124,6 @@ function registerEventHandlers() {
   });
 }
 
-async function registerSlashCommands() {
-  try {
-    const commandData = Array.from(client.commands.values()).map(cmd => cmd.data.toJSON());
-    
-    if (!client.application) {
-      discordLogger.error('Client application not available for command registration');
-      return;
-    }
-
-    // Register commands globally (takes up to 1 hour to propagate)
-    // For development, you might want to register to a specific guild for instant updates
-    await client.application.commands.set(commandData);
-    
-    discordLogger.info(`Registered ${commandData.length} global slash commands`);
-  } catch (error) {
-    discordLogger.error(error, 'Failed to register slash commands');
-  }
-}
 
 async function cleanup() {
   try {

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { DiscordUserMapping } from '../types/discord';
 import { authLogger } from '../utils/logger';
 
@@ -48,34 +49,22 @@ export class UserService {
   async createOrUpdateUser(discordId: string, discordUsername: string): Promise<DiscordUserMapping> {
     try {
       if (this.prisma) {
-        // First try to find existing user
-        let user = await this.prisma.discordUser.findUnique({
+        // Upsert to avoid race conditions and satisfy NOT NULL id
+        const user = await this.prisma.discordUser.upsert({
           where: { discordId },
-          include: { user: true }
+          update: {
+            discordUsername,
+            updatedAt: new Date(),
+          },
+          create: {
+            id: discordId, // stable primary key; avoids requiring DB defaults
+            discordId,
+            discordUsername,
+            isAuthenticated: false,
+          },
+          include: { user: true },
         });
-
-        if (user) {
-          // Update existing user if needed
-          if (user.discordUsername !== discordUsername) {
-            user = await this.prisma.discordUser.update({
-              where: { discordId },
-              data: { discordUsername },
-              include: { user: true }
-            });
-            authLogger.info({ discordId, discordUsername }, 'Updated user mapping');
-          }
-        } else {
-          // Create new user
-          user = await this.prisma.discordUser.create({
-            data: {
-              discordId,
-              discordUsername,
-              isAuthenticated: false
-            },
-            include: { user: true }
-          });
-          authLogger.info({ discordId, discordUsername }, 'Created new user mapping');
-        }
+        authLogger.info({ discordId, discordUsername }, 'Upserted user mapping');
         
         return {
           discordId: user.discordId,
@@ -121,7 +110,8 @@ export class UserService {
           where: { discordId },
           data: { 
             userId: yahooUserId,
-            isAuthenticated: true
+            isAuthenticated: true,
+            updatedAt: new Date(),
           }
         });
         
@@ -151,7 +141,8 @@ export class UserService {
           where: { discordId },
           data: { 
             userId: null,
-            isAuthenticated: false
+            isAuthenticated: false,
+            updatedAt: new Date(),
           }
         });
         

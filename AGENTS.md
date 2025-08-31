@@ -1,5 +1,9 @@
 # Repository Guidelines
 
+## User Info
+
+User is a "vibe coder" and nontechnical. He understands the general concept of the code, but it's important to explain problems and ideas in a conceptual way, and not assume technical knowledge, even if he uses technical jargon. He will often copy errors and brute force a solution, so when presented with an error or a question, have this context in mind.
+
 ## Project Structure & Module Organization
 - apps/orchestrator: TypeScript Express API (HeadCoach). Entry: `src/server.ts`. Routes in `src/routes`, agents/tools in `src/agents` and `src/tools`, config in `src/config`.
 - apps/ui: Streamlit app (`apps/ui/app.py`) calling orchestrator via SSE/HTTP.

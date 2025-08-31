@@ -2,6 +2,10 @@
 
 This file provides guidance when working with code in this repository.
 
+## User Info
+
+User is a "vibe coder" and nontechnical. He understands the general concept of the code, but it's important to explain problems and ideas in a conceptual way, and not assume technical knowledge, even if he uses technical jargon. He will often copy errors and brute force a solution, so when presented with an error or a question, have this context in mind.
+
 ## Project Overview
 
 Yahoo Fantasy "HeadCoach" is an AI-powered fantasy football management assistant that automates team optimization decisions. It provides daily reports, waiver wire recommendations, and lineup suggestions using a policy-driven approach with confidence thresholds for automated execution vs manual approval.

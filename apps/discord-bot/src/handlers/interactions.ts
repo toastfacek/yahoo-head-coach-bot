@@ -1,12 +1,26 @@
-import { Interaction, ChatInputCommandInteraction, ButtonInteraction, EmbedBuilder } from 'discord.js';
+import { Interaction, ChatInputCommandInteraction, ButtonInteraction, EmbedBuilder, MessageFlags } from 'discord.js';
 import { ExtendedClient } from '../types/discord';
 import { discordLogger } from '../utils/logger';
 import { userService } from '../services/userService';
+import { interactionLock } from '../services/lock';
 import { orchestratorApi } from '../services/orchestratorApi';
 
 export async function handleInteraction(client: ExtendedClient, interaction: Interaction) {
+  const executionId = Math.random().toString(36).substring(7);
+  discordLogger.info({
+    interactionType: interaction.type,
+    interactionId: interaction.id,
+    executionId
+  }, 'ULTRATHINK: Top level handleInteraction called');
+  const gotLock = await interactionLock.acquire(interaction.id);
+  if (!gotLock) {
+    discordLogger.warn({ interactionId: interaction.id, executionId }, 'Duplicate interaction detected, dropping');
+    return;
+  }
+  
   try {
     if (interaction.isChatInputCommand()) {
+      discordLogger.info({ executionId, interactionId: interaction.id }, 'ULTRATHINK: Routing to handleSlashCommand');
       await handleSlashCommand(client, interaction);
     } else if (interaction.isButton()) {
       await handleButtonInteraction(client, interaction);
@@ -14,33 +28,57 @@ export async function handleInteraction(client: ExtendedClient, interaction: Int
       await handleSelectMenu(client, interaction);
     }
   } catch (error) {
-    discordLogger.error({ error, interactionType: interaction.type }, 'Error handling interaction');
+    const executionId = Math.random().toString(36).substring(7);
+    discordLogger.error({ 
+      error, 
+      interactionType: interaction.type, 
+      interactionId: interaction.id, 
+      executionId 
+    }, 'ULTRATHINK: Main error handler triggered');
     
     const errorMessage = 'An error occurred while processing your request.';
     
     try {
       if (interaction.isRepliable()) {
+        discordLogger.info({ 
+          interactionId: interaction.id, 
+          executionId,
+          replied: interaction.replied,
+          deferred: interaction.deferred
+        }, 'ULTRATHINK: Error handler checking interaction state');
+        
         if (interaction.replied || interaction.deferred) {
+          discordLogger.info({ interactionId: interaction.id, executionId }, 'ULTRATHINK: Error handler using editReply');
           await interaction.editReply({ content: errorMessage });
         } else {
-          await interaction.reply({ content: errorMessage, ephemeral: true });
+          discordLogger.info({ interactionId: interaction.id, executionId }, 'ULTRATHINK: Error handler using reply');
+          await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
         }
       }
     } catch (replyError) {
-      discordLogger.error({ replyError }, 'Failed to send error response');
+      discordLogger.error({ replyError, interactionId: interaction.id, executionId }, 'ULTRATHINK: Error handler failed to send response');
     }
+  } finally {
+    await interactionLock.release(interaction.id);
   }
 }
 
 async function handleSlashCommand(client: ExtendedClient, interaction: ChatInputCommandInteraction) {
+  const executionId = Math.random().toString(36).substring(7);
   const command = client.commands.get(interaction.commandName);
   
+  discordLogger.info({
+    commandName: interaction.commandName,
+    userId: interaction.user.id,
+    username: interaction.user.username,
+    guildId: interaction.guildId,
+    executionId,
+    interactionId: interaction.id
+  }, 'ULTRATHINK: handleSlashCommand called');
+  
   if (!command) {
-    discordLogger.warn({ commandName: interaction.commandName }, 'Unknown slash command');
-    await interaction.reply({
-      content: 'Unknown command.',
-      ephemeral: true
-    });
+    discordLogger.warn({ commandName: interaction.commandName, executionId }, 'Unknown slash command');
+    await interaction.reply({ content: 'Unknown command.', flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -48,11 +86,9 @@ async function handleSlashCommand(client: ExtendedClient, interaction: ChatInput
     commandName: interaction.commandName,
     userId: interaction.user.id,
     username: interaction.user.username,
-    guildId: interaction.guildId
+    guildId: interaction.guildId,
+    executionId
   }, 'Executing slash command');
-
-  // Ensure user exists in our system
-  await userService.createOrUpdateUser(interaction.user.id, interaction.user.username);
 
   await command.execute(interaction);
 }
@@ -82,11 +118,60 @@ async function handleButtonInteraction(client: ExtendedClient, interaction: Butt
     case 'refresh':
       await handleRefreshButton(interaction, params[0]); // data type (lineup, waivers, etc.)
       break;
+    case 'auth':
+      if (params[0] === 'status') {
+        await handleAuthStatusButton(interaction);
+      } else {
+        await interaction.reply({ content: 'Unknown auth action.', flags: MessageFlags.Ephemeral });
+      }
+      break;
     default:
       await interaction.reply({
         content: 'Unknown button action.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
+  }
+}
+
+async function handleAuthStatusButton(interaction: ButtonInteraction) {
+  const discordId = interaction.user.id;
+  try {
+    // Acknowledge quickly
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+
+    const user = await userService.getUser(discordId);
+    const isAuth = await userService.isAuthenticated(discordId);
+
+    let description = '';
+    let color = 0xff0000;
+    if (isAuth && user?.yahooUserId) {
+      const oauthStatus = await orchestratorApi.checkOAuthStatus(user.yahooUserId);
+      if (oauthStatus.authenticated) {
+        description =
+          '✅ Connected to Yahoo Fantasy Football\n\n' +
+          `Yahoo ID: \`${user.yahooUserId}\`\n` +
+          (oauthStatus.userInfo?.expiresAt ? `Expires: ${oauthStatus.userInfo.expiresAt}\n` : '') +
+          '\nYou can now use fantasy commands.';
+        color = 0x00ff00;
+      } else {
+        description = '⚠️ Authentication expired. Use /auth login to reconnect.';
+        color = 0xff9900;
+      }
+    } else {
+      description = '❌ Not connected. Use /auth login to connect your Yahoo account.';
+      color = 0xff0000;
+    }
+
+    const embed = new EmbedBuilder().setTitle('Authentication Status').setDescription(description).setColor(color);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ embeds: [embed] });
+    } else {
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    }
+  } catch (error) {
+    await interaction.editReply({ content: '❌ Failed to check authentication status.' }).catch(() => {});
   }
 }
 
@@ -101,10 +186,7 @@ async function handleSelectMenu(client: ExtendedClient, interaction: any) {
   if (interaction.customId === 'select_league') {
     const selectedLeagueId = interaction.values[0];
     
-    await interaction.reply({
-      content: `Selected league: ${selectedLeagueId}. You can now use fantasy commands with this league.`,
-      ephemeral: true
-    });
+    await interaction.reply({ content: `Selected league: ${selectedLeagueId}. You can now use fantasy commands with this league.`, flags: MessageFlags.Ephemeral });
     
     // Could store user's preferred league in database here
   }
@@ -116,24 +198,18 @@ async function handleApproveButton(interaction: ButtonInteraction, recommendatio
   // Check authentication
   const isAuth = await userService.isAuthenticated(discordId);
   if (!isAuth) {
-    await interaction.reply({
-      content: '🔐 You need to be authenticated to approve recommendations.',
-      ephemeral: true
-    });
+    await interaction.reply({ content: '🔐 You need to be authenticated to approve recommendations.', flags: MessageFlags.Ephemeral });
     return;
   }
 
   const yahooUserId = await userService.getYahooUserId(discordId);
   if (!yahooUserId) {
-    await interaction.reply({
-      content: '❌ Authentication error. Please re-authenticate.',
-      ephemeral: true
-    });
+    await interaction.reply({ content: '❌ Authentication error. Please re-authenticate.', flags: MessageFlags.Ephemeral });
     return;
   }
 
   try {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const success = await orchestratorApi.approveRecommendation(yahooUserId, recommendationId);
     
@@ -162,24 +238,18 @@ async function handleRejectButton(interaction: ButtonInteraction, recommendation
   // Check authentication
   const isAuth = await userService.isAuthenticated(discordId);
   if (!isAuth) {
-    await interaction.reply({
-      content: '🔐 You need to be authenticated to reject recommendations.',
-      ephemeral: true
-    });
+    await interaction.reply({ content: '🔐 You need to be authenticated to reject recommendations.', flags: MessageFlags.Ephemeral });
     return;
   }
 
   const yahooUserId = await userService.getYahooUserId(discordId);
   if (!yahooUserId) {
-    await interaction.reply({
-      content: '❌ Authentication error. Please re-authenticate.',
-      ephemeral: true
-    });
+    await interaction.reply({ content: '❌ Authentication error. Please re-authenticate.', flags: MessageFlags.Ephemeral });
     return;
   }
 
   try {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const success = await orchestratorApi.rejectRecommendation(yahooUserId, recommendationId);
     
