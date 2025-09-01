@@ -72,7 +72,21 @@ async function handleLogin(
   discordUsername: string
 ) {
   try {
-    const authUrl = await orchestratorApi.createOAuthSession(discordId);
+    // Defer the reply since we might need time to process
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    }
+
+    // Direct Yahoo OAuth URL construction (bypassing orchestrator)
+    const yahooClientId = process.env.YAHOO_CLIENT_ID || 'your-yahoo-client-id';
+    const redirectUri = process.env.YAHOO_REDIRECT_URI || 'https://your-app.railway.app/api/oauth/callback';
+    
+    const authUrl = `https://api.login.yahoo.com/oauth2/request_auth?` +
+      `client_id=${encodeURIComponent(yahooClientId)}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_type=code&` +
+      `scope=fspt-w&` +
+      `state=${encodeURIComponent(discordId)}`;
     const embed = new EmbedBuilder()
       .setTitle('Connect Yahoo Fantasy Football')
       .setDescription('Authorize the bot to access your Yahoo Fantasy data. You can revoke access at any time in Yahoo settings.')
@@ -85,13 +99,8 @@ async function handleLogin(
 
     const payload = { embeds: [embed], components: [row] } as const;
 
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
-    } else if (interaction.deferred) {
-      await interaction.editReply(payload as any);
-    } else {
-      await interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
-    }
+    // Since we deferred, always use editReply
+    await interaction.editReply(payload as any);
 
     // Background user sync (no additional messages)
     userService
@@ -99,13 +108,15 @@ async function handleLogin(
       .catch((err) => authLogger.warn({ err, discordId }, 'User upsert failed post-link display'));
   } catch (error) {
     authLogger.error({ error, discordId }, 'Failed to generate auth URL');
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction
-        .reply({
-          content: '❌ Failed to generate authentication link. Please try again later.',
-          flags: MessageFlags.Ephemeral,
-        })
-        .catch(() => {});
+    const errorMessage = '❌ Failed to generate authentication link. Please try again later.';
+    
+    if (interaction.deferred) {
+      await interaction.editReply({ content: errorMessage }).catch(() => {});
+    } else if (!interaction.replied) {
+      await interaction.reply({
+        content: errorMessage,
+        flags: MessageFlags.Ephemeral,
+      }).catch(() => {});
     }
   }
 }
