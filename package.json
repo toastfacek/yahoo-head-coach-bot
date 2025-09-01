@@ -12,6 +12,8 @@
     "build:discord": "npm run build --workspace=apps/discord-bot",
     "start:discord": "npm run build --workspace=apps/discord-bot && npm run start --workspace=apps/discord-bot",
     "test": "npm run test --workspace=apps/orchestrator",
+    "test:e2e": "npx tsx scripts/run-e2e-tests.ts",
+    "test:e2e:watch": "npx vitest tests/e2e --reporter=verbose",
     "check:setup": "npm run check:setup --workspace=apps/orchestrator",
     "deploy-commands": "npm run deploy-commands --workspace=apps/discord-bot"
   },

@@ -392,6 +392,57 @@ Historian (Existing Audit Trail) - PRESERVED
 
 ---
 
+
+## Agent MVP Recommendations (Discord Assistant GM)
+
+Objective: Ship a reliable Discord experience where a user chats with their assistant GM and gets actionable, personal information for their Yahoo fantasy league. Focus on stability, structured outputs, and minimal data required.
+
+### Scope (MVP)
+- Slash commands: `/auth`, `/lineup`, `/waivers`, `/approvals` produce actionable embeds.
+- Chat: `/api/chat` SSE remains for conversational usage; slash commands return fast, structured JSON.
+- Personalization: Uses the user’s linked Yahoo account, first league by default (optional league override).
+
+### Data Needs (by task)
+- Lineup: Yahoo roster with `selected_position`, `eligible_positions`, injury status; team/league keys. Optional: matchup/weather/vegas/news (post‑MVP).
+- Waivers: Free agent pool (by position), team FAB remaining (and optional league FAB rules), roster needs. Optional: projections/rankings/news.
+- Approvals/Execution: League key, team key, validated player keys; policy thresholds (confidence/FAB caps); post‑draft gate.
+
+### Simplifications for MVP
+- Skip Rube MCP live data; use deterministic heuristics from Yahoo roster + injury codes.
+- Non‑streaming for slash commands: call tools directly and return `FantasyReportData` (arrays), not free‑form text.
+- Default league: if not specified, use first returned league; persist preferred league later.
+- Minimal waivers: start with 1–2 positions (e.g., WR/RB) and top N free agents; expand later.
+
+### Implementation Steps
+1) Yahoo service: add "list free agents" for league (status=FA, sorted) and fetch FAB remaining for the user’s team.
+2) Analyst: pass `availablePlayers` + real FAB into `AnalystAgent`; cap and format bids using guardrails.
+3) Routes: make `/lineup/check` and `/waivers/run` return full `FantasyReportData`:
+   - Lineup: map `LINEUP_SWAP` to `{ action, player, reason, confidence }`.
+   - Waivers: map waiver recs to `{ action: 'add/drop', player, fab, confidence }`.
+4) Approvals: ensure staged payloads are normalized (type, reason, confidence) for Discord embeds.
+5) Discord UX: use existing commands; render embeds from structured arrays (no parsing of text blocks).
+
+### Prompt & Workflow Improvements
+- HeadCoach system prompt: explicitly instruct to pass prior `scout` output into `analyst`; note that tools’ structured outputs are the source of truth for API responses.
+- AnalystAgent prompts: include dynamic FAB limits; “limit to top 5 targets”; require numeric bids and confidence.
+- Tool I/O: tighten Zod schemas for executor inputs and route response builders to avoid drift.
+- Error UX: when data missing (e.g., FA list), populate `notes[]` with clear guidance and still return lineup results.
+
+### Rube MCP (Post‑MVP)
+- Phase 1: integrate small set of MCP tools with caching/timeouts: weather by stadium, Reddit search for 3–5 key players, beat‑reporter web search.
+- Add MCP health check + graceful fallback to heuristics when down. Map Yahoo player IDs ↔ names used by MCP.
+
+### Risks & Observability
+- Discord interaction hygiene (40060/10062): keep one‑shot replies for fast paths; `deferReply -> editReply` for slow paths; ephemeral via flags. Use interaction lock (Redis in prod).
+- State security: move OAuth state store and locks to Redis in production; keep consume‑once semantics.
+- Metrics: ack latency, session timing, and correlation IDs from interaction → session → callback.
+
+### Acceptance Criteria (MVP)
+- `/auth login` → authorize → `/auth status` shows connected; `/leagues` returns user’s leagues.
+- `/lineup` returns `FantasyReportData` with at least one structured recommendation when applicable.
+- `/waivers` returns `FantasyReportData.waivers[]` with 1–5 targets using real FAB; handles empty pool gracefully.
+- Approvals flow: staged → approve executes via Yahoo and updates status; reject updates to REJECTED.
+
 ## Milestone 11: Deployment & Shipping
 
 **Goal:** Deploy all services and prepare for launch.

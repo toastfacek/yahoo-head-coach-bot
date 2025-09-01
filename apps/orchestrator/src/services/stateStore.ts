@@ -28,6 +28,7 @@ class InMemoryStateStore {
       this.store.delete(key);
       return null;
     }
+    if (rec.used) return null;
     return rec.value;
   }
 
@@ -45,7 +46,7 @@ class InMemoryStateStore {
 
   private sweep() {
     const now = Date.now();
-    for (const [k, v] of this.store.entries()) {
+    for (const [k, v] of Array.from(this.store.entries())) {
       if (v.expiresAt <= now) this.store.delete(k);
     }
   }

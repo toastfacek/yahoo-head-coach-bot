@@ -14,8 +14,8 @@ export async function createOAuthSession(req: Request, res: Response): Promise<v
   }
 
   const { discordId } = parsed.data;
-  const secret = env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
-  const kid = env.JWT_KID || undefined;
+  const secret = process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+  const kid = process.env.JWT_KID || env.JWT_KID || undefined;
 
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + 5 * 60; // 5 minutes

@@ -25,12 +25,12 @@ export async function oauthStart(req: Request, res: Response): Promise<void> {
     // Validate signed state if provided; otherwise allow legacy userId in dev only
     let ensuredUserId: string | null = null;
     try {
-      const secret = env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+      const secret = process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
       const payload = verifyJWT<any>(String(state), secret);
       if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
       if (!payload.jti) throw new Error('Missing jti');
-      const rec = await stateStore.consume(payload.jti);
-      if (!rec) throw new Error('Invalid or consumed state');
+      const rec = await stateStore.get(payload.jti);
+      if (!rec) throw new Error('Invalid or expired state');
       ensuredUserId = String(rec.discordId || payload.sub || 'dev');
     } catch (e) {
       res.status(400).send('<h2>❌ Invalid Authorization Request</h2><p>Invalid or expired state parameter</p>');
@@ -94,7 +94,7 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     // Validate state parameter (CSRF protection)
     let ensuredUserId: string | null = null;
     try {
-      const secret = env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+      const secret = process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
       const payload = verifyJWT<any>(String(state), secret);
       if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
       if (!payload.jti) throw new Error('Missing jti');
