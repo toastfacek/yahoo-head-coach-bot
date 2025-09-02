@@ -1,9 +1,9 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npx prisma generate --schema=packages/data/prisma/schema.prisma"
+buildCommand = "npm install && npx prisma generate --schema=packages/data/prisma/schema.prisma && npm run -w @yahoo-fantasy-bot/orchestrator build"
 
 [deploy]
-startCommand = "node apps/orchestrator/src/server-railway.js"
+startCommand = "node apps/orchestrator/dist/server.js"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "always"
