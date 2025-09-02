@@ -10,6 +10,5 @@ restartPolicyType = "always"
 
 [env]
 NODE_ENV = "production"
-PORT = "3000"
 SERVICE = "orchestrator"
 NODE_OPTIONS = "--max-old-space-size=2048"
