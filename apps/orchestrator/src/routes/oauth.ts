@@ -97,8 +97,8 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
       if (!payload.jti) throw new Error('Missing jti');
       const rec = await stateStore.consume(payload.jti);
       // If rec is missing (e.g., different instance), fall back to JWT subject
-      ensuredUserId = String((rec && (rec as any).discordId) || payload.sub);
-      if (!ensuredUserId) throw new Error('Missing ensured user id');
+      ensuredUserId = String((rec && (rec as any).discordId) || payload.sub || '');
+      if (!ensuredUserId || ensuredUserId === 'dev') throw new Error('Missing ensured user id');
     } catch (e) {
       res.status(400).send(`
         <h2>❌ Invalid Authorization Request</h2>
@@ -111,8 +111,8 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     // Exchange authorization code for access token
     const tokenResponse = await exchangeCodeForTokens(code as string);
 
-    // Create or find user
-    const userId = ensuredUserId || 'dev';
+    // Create or find user (must be present from state/JWT)
+    const userId = ensuredUserId as string;
     let user = await prisma.user.findUnique({
       where: { id: userId },
     });
