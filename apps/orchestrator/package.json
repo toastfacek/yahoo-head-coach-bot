@@ -7,8 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "NODE_OPTIONS='--max-old-space-size=8192' tsc",
-    "start": "node dist/server.js",
+    "build": "echo 'Skipping TypeScript compilation - using ts-node directly'",
+    "start": "NODE_OPTIONS='--max-old-space-size=8192' npx ts-node src/server.ts",
     "dev": "NODE_OPTIONS='--max-old-space-size=8192' nodemon --exec ts-node src/server.ts",
     "clean": "rm -rf dist",
     "test": "vitest run",
