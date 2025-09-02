@@ -9,7 +9,9 @@ import pinoHttp from 'pino-http';
 
 import { env, allowedOrigins } from './config/env';
 import { connectDatabase, getDatabaseHealth, disconnectDatabase } from './db';
+console.log('🔄 Importing routes...');
 import router from './routes';
+console.log('✅ Routes imported successfully');
 
 const app = express();
 // Prefer platform-provided PORT (e.g., Railway), then env schema, then 3000
@@ -46,7 +48,13 @@ app.use('/api/scheduler', limiter);
 app.use('/api/approvals', limiter);
 
 // API routes
-app.use('/api', router);
+console.log('🔄 Loading API routes...');
+try {
+  app.use('/api', router);
+  console.log('✅ API routes loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load API routes:', error);
+}
 
 // Debug routes for Railway
 app.get('/debug/routes', (req, res) => {
