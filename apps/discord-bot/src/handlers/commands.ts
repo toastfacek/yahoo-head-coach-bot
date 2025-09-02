@@ -5,6 +5,7 @@ import { lineupCommand } from '../commands/lineup';
 import { waiversCommand } from '../commands/waivers';
 import { reportCommand } from '../commands/report';
 import { approvalsCommand } from '../commands/approvals';
+import { listCommand } from '../commands/list';
 
 export function loadCommands(): Collection<string, BotCommand> {
   const commands = new Collection<string, BotCommand>();
@@ -15,6 +16,7 @@ export function loadCommands(): Collection<string, BotCommand> {
   commands.set(waiversCommand.data.name, waiversCommand);
   commands.set(reportCommand.data.name, reportCommand);
   commands.set(approvalsCommand.data.name, approvalsCommand);
+  commands.set(listCommand.data.name, listCommand);
 
   return commands;
 }
