@@ -209,7 +209,10 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
       res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
       return;
     }
-    const userId = String(parsed.data.userId || 'dev');
+    const rawUserId = String(parsed.data.userId || 'dev');
+    // Allow passing a Discord ID; map to internal userId if a DiscordUser exists
+    const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
+    const userId = map?.userId || rawUserId;
     const tok = await prisma.yahooToken.findUnique({ where: { userId } });
     if (!tok) {
       res.json({ authenticated: false, userId });
@@ -243,7 +246,9 @@ export async function refreshNow(req: Request, res: Response): Promise<void> {
       res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
       return;
     }
-    const userId = String(parsed.data.userId || 'dev');
+    const rawUserId = String(parsed.data.userId || 'dev');
+    const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
+    const userId = map?.userId || rawUserId;
     await refreshToken(userId);
     const tok = await prisma.yahooToken.findUnique({ where: { userId } });
     res.json({ ok: true, userId, expiresAt: tok?.expiresAt?.toISOString() });

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { listUserLeagues } from '../services/yahoo';
+import { prisma } from '../db';
 
 const Query = z.object({ userId: z.string().min(1) });
 
@@ -12,8 +13,11 @@ export async function getUserLeagues(req: Request, res: Response) {
     return;
   }
 
-  const { userId } = parsed.data;
+  const { userId: rawUserId } = parsed.data;
   try {
+    // Map Discord ID to internal userId if applicable
+    const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
+    const userId = map?.userId || rawUserId;
     const leagues = await listUserLeagues(userId, 'nfl');
     res.json({ leagues });
   } catch (error: any) {

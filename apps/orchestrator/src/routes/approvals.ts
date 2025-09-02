@@ -49,7 +49,10 @@ export async function approve(req: Request, res: Response): Promise<void> {
       .status(400)
       .json({ error: 'Invalid body', details: parsed.error.flatten() });
 
-  const { id, userId } = parsed.data;
+  const { id, userId: rawUserId } = parsed.data;
+  // Map Discord ID to internal userId if applicable
+  const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
+  const userId = map?.userId || rawUserId;
   const rec = await prisma.recommendation.findUnique({ where: { id } });
   if (!rec) return void res.status(404).json({ error: 'Not found' });
 
