@@ -29,6 +29,7 @@ export async function oauthStart(req: Request, res: Response): Promise<void> {
       if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
       if (!payload.jti) throw new Error('Missing jti');
       // Do not require presence in stateStore at this step to avoid cross-instance issues
+      console.log('[oauth-start] validated state', { jti: payload.jti, sub: payload.sub });
     } catch (e) {
       res.status(400).send('<h2>❌ Invalid Authorization Request</h2><p>Invalid or expired state parameter</p>');
       return;
@@ -99,6 +100,7 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
       // If rec is missing (e.g., different instance), fall back to JWT subject
       ensuredUserId = String((rec && (rec as any).discordId) || payload.sub || '');
       if (!ensuredUserId || ensuredUserId === 'dev') throw new Error('Missing ensured user id');
+      console.log('[oauth-callback] ensuredUserId', { jti: payload.jti, ensuredUserId, hadState: !!rec });
     } catch (e) {
       res.status(400).send(`
         <h2>❌ Invalid Authorization Request</h2>
@@ -201,13 +203,13 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
  */
 export async function tokenStatus(req: Request, res: Response): Promise<void> {
   try {
-    const Query = z.object({ userId: z.string().optional() });
+    const Query = z.object({ userId: z.string() });
     const parsed = Query.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
       return;
     }
-    const rawUserId = String(parsed.data.userId || 'dev');
+    const rawUserId = String(parsed.data.userId);
     // Allow passing a Discord ID; map to internal userId if a DiscordUser exists
     const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
     const userId = map?.userId || rawUserId;
@@ -238,13 +240,13 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
  */
 export async function refreshNow(req: Request, res: Response): Promise<void> {
   try {
-    const Query = z.object({ userId: z.string().optional() });
+    const Query = z.object({ userId: z.string() });
     const parsed = Query.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
       return;
     }
-    const rawUserId = String(parsed.data.userId || 'dev');
+    const rawUserId = String(parsed.data.userId);
     const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
     const userId = map?.userId || rawUserId;
     await refreshToken(userId);

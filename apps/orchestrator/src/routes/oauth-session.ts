@@ -32,6 +32,6 @@ export async function createOAuthSession(req: Request, res: Response): Promise<v
   const base = `${proto}://${host}`;
   const authorize_url = `${base}/api/oauth/start?state=${encodeURIComponent(token)}`;
 
+  console.log('[oauth-session] created', { jti, sub: discordId, exp });
   res.json({ authorize_url });
 }
-
