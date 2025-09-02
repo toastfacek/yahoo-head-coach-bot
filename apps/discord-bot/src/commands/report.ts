@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, MessageFlags } from 'discord.js';
 import { BotCommand } from '../types/discord';
 import { orchestratorApi } from '../services/orchestratorApi';
 import { userService } from '../services/userService';
@@ -24,7 +24,7 @@ export const reportCommand: BotCommand = {
     if (!isAuth) {
       await interaction.reply({
         content: '🔐 You need to authenticate first. Use `/auth login` to connect your Yahoo account.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -33,7 +33,7 @@ export const reportCommand: BotCommand = {
     if (!yahooUserId) {
       await interaction.reply({
         content: '❌ Authentication error. Please try `/auth logout` and `/auth login` again.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }

@@ -278,24 +278,24 @@ async function handleDetailsButton(interaction: ButtonInteraction, recommendatio
   // Check authentication
   const isAuth = await userService.isAuthenticated(discordId);
   if (!isAuth) {
-    await interaction.reply({
-      content: '🔐 You need to be authenticated to view recommendation details.',
-      ephemeral: true
-    });
+      await interaction.reply({
+        content: '🔐 You need to be authenticated to view recommendation details.',
+        flags: MessageFlags.Ephemeral,
+      });
     return;
   }
 
   const yahooUserId = await userService.getYahooUserId(discordId);
   if (!yahooUserId) {
-    await interaction.reply({
-      content: '❌ Authentication error. Please re-authenticate.',
-      ephemeral: true
-    });
+      await interaction.reply({
+        content: '❌ Authentication error. Please re-authenticate.',
+        flags: MessageFlags.Ephemeral,
+      });
     return;
   }
 
   try {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     // Get user's leagues to find the recommendation
     const leagues = await orchestratorApi.getUserLeagues(yahooUserId);
@@ -402,7 +402,7 @@ async function handleDetailsButton(interaction: ButtonInteraction, recommendatio
 async function handleRefreshButton(interaction: ButtonInteraction, dataType: string) {
   await interaction.reply({
     content: `🔄 Refreshing ${dataType} data...`,
-    ephemeral: true
+    flags: MessageFlags.Ephemeral,
   });
 
   // Could trigger a refresh of the original command here

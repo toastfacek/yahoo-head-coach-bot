@@ -12,10 +12,25 @@ export class UserService {
 
   constructor() {
     try {
+      // If DATABASE_URL is not defined for the bot, default to in-memory
+      if (!process.env.DATABASE_URL) {
+        authLogger.warn('No DATABASE_URL configured for discord-bot; using in-memory user store');
+        this.prisma = null;
+        return;
+      }
+
       this.prisma = new PrismaClient();
-      authLogger.info('Connected to database for user service');
+      // Attempt a background connect; on failure, fall back to in-memory
+      this.prisma
+        .$connect()
+        .then(() => authLogger.info('Connected to database for user service'))
+        .catch((error) => {
+          authLogger.warn({ error }, 'Database connect failed, using in-memory store');
+          this.prisma = null;
+        });
     } catch (error) {
-      authLogger.warn(error, 'Database connection failed, using in-memory store');
+      authLogger.warn(error, 'Database initialization failed, using in-memory store');
+      this.prisma = null;
     }
   }
 
@@ -38,11 +53,11 @@ export class UserService {
           };
         }
       }
-      
+      // Fallback to in-memory store if prisma not available or no record
       return this.userMappings.get(discordId) || null;
     } catch (error) {
-      authLogger.error({ error, discordId }, 'Failed to get user');
-      return null;
+      authLogger.error({ error, discordId }, 'Failed to get user (falling back to in-memory)');
+      return this.userMappings.get(discordId) || null;
     }
   }
 
@@ -98,8 +113,25 @@ export class UserService {
       authLogger.info({ discordId, discordUsername }, 'Created new user mapping (in-memory)');
       return userData;
     } catch (error) {
-      authLogger.error({ error, discordId, discordUsername }, 'Failed to create/update user');
-      throw error;
+      // On any Prisma error, fall back to in-memory
+      authLogger.warn({ error, discordId, discordUsername }, 'DB upsert failed, using in-memory user store');
+      const existing = this.userMappings.get(discordId);
+      if (existing) {
+        existing.discordUsername = discordUsername;
+        existing.updatedAt = new Date();
+        this.userMappings.set(discordId, existing);
+        return existing;
+      }
+      const userData: DiscordUserMapping = {
+        discordId,
+        discordUsername,
+        yahooUserId: undefined,
+        isAuthenticated: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.userMappings.set(discordId, userData);
+      return userData;
     }
   }
 
@@ -129,8 +161,19 @@ export class UserService {
 
       authLogger.info({ discordId, yahooUserId }, 'Linked Yahoo account (in-memory)');
     } catch (error) {
-      authLogger.error({ error, discordId, yahooUserId }, 'Failed to link Yahoo account');
-      throw error;
+      authLogger.warn({ error, discordId, yahooUserId }, 'DB link failed, using in-memory user store');
+      const user = this.userMappings.get(discordId) || {
+        discordId,
+        discordUsername: discordId,
+        yahooUserId: null,
+        isAuthenticated: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      user.yahooUserId = yahooUserId;
+      user.isAuthenticated = true;
+      user.updatedAt = new Date();
+      this.userMappings.set(discordId, user);
     }
   }
 
@@ -160,8 +203,14 @@ export class UserService {
 
       authLogger.info({ discordId }, 'Unlinked Yahoo account (in-memory)');
     } catch (error) {
-      authLogger.error({ error, discordId }, 'Failed to unlink Yahoo account');
-      throw error;
+      authLogger.warn({ error, discordId }, 'DB unlink failed, using in-memory user store');
+      const user = this.userMappings.get(discordId);
+      if (user) {
+        user.yahooUserId = undefined;
+        user.isAuthenticated = false;
+        user.updatedAt = new Date();
+        this.userMappings.set(discordId, user);
+      }
     }
   }
 
@@ -194,8 +243,8 @@ export class UserService {
       
       return Array.from(this.userMappings.values());
     } catch (error) {
-      authLogger.error(error, 'Failed to get all users');
-      return [];
+      authLogger.warn(error, 'DB fetch failed, returning in-memory users');
+      return Array.from(this.userMappings.values());
     }
   }
 
