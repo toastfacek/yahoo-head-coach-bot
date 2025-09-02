@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { DiscordUserMapping } from '../types/discord';
 import { authLogger } from '../utils/logger';
+import { orchestratorApi } from './orchestratorApi';
 
 // Note: We'll extend the existing Prisma schema to include Discord user mappings
 // For now, we'll use a simple in-memory store and prepare for database integration
@@ -251,6 +252,27 @@ export class UserService {
   async cleanup(): Promise<void> {
     if (this.prisma) {
       await this.prisma.$disconnect();
+    }
+  }
+
+  /**
+   * Attempt to reconcile auth status from the orchestrator. If orchestrator reports
+   * the user (by discordId) is authenticated, link locally and return true.
+   */
+  async ensureAuthenticated(discordId: string, discordUsername: string): Promise<boolean> {
+    try {
+      // Ensure a local record exists first
+      await this.createOrUpdateUser(discordId, discordUsername);
+
+      const status = await orchestratorApi.checkOAuthStatus(discordId);
+      if (status?.authenticated) {
+        await this.linkYahooAccount(discordId, discordId);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      authLogger.warn({ error, discordId }, 'Failed to ensure authentication via orchestrator');
+      return false;
     }
   }
 }

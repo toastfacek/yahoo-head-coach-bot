@@ -19,20 +19,16 @@ export const waiversCommand: BotCommand = {
     const discordId = interaction.user.id;
     const leagueId = interaction.options.getString('league');
 
-    // Check authentication
-    const isAuth = await userService.isAuthenticated(discordId);
+    // Check authentication; if missing, attempt to sync from orchestrator
+    let isAuth = await userService.isAuthenticated(discordId);
     if (!isAuth) {
+      const synced = await userService.ensureAuthenticated(discordId, interaction.user.username);
+      isAuth = synced || (await userService.isAuthenticated(discordId));
+    }
+    let yahooUserId = await userService.getYahooUserId(discordId);
+    if (!isAuth || !yahooUserId) {
       await interaction.reply({
         content: '🔐 You need to authenticate first. Use `/auth login` to connect your Yahoo account.',
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
-    const yahooUserId = await userService.getYahooUserId(discordId);
-    if (!yahooUserId) {
-      await interaction.reply({
-        content: '❌ Authentication error. Please try `/auth logout` and `/auth login` again.',
         flags: MessageFlags.Ephemeral,
       });
       return;
