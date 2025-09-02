@@ -22,16 +22,13 @@ export async function oauthStart(req: Request, res: Response): Promise<void> {
     }
     const { state } = parsed.data as any;
 
-    // Validate signed state if provided; otherwise allow legacy userId in dev only
-    let ensuredUserId: string | null = null;
+    // Validate the signed state minimally (do not consume here)
     try {
       const secret = process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
       const payload = verifyJWT<any>(String(state), secret);
       if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
       if (!payload.jti) throw new Error('Missing jti');
-      const rec = await stateStore.get(payload.jti);
-      if (!rec) throw new Error('Invalid or expired state');
-      ensuredUserId = String(rec.discordId || payload.sub || 'dev');
+      // Do not require presence in stateStore at this step to avoid cross-instance issues
     } catch (e) {
       res.status(400).send('<h2>❌ Invalid Authorization Request</h2><p>Invalid or expired state parameter</p>');
       return;
@@ -99,8 +96,9 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
       if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
       if (!payload.jti) throw new Error('Missing jti');
       const rec = await stateStore.consume(payload.jti);
-      if (!rec) throw new Error('Invalid or consumed state');
-      ensuredUserId = String(rec.discordId || payload.sub || 'dev');
+      // If rec is missing (e.g., different instance), fall back to JWT subject
+      ensuredUserId = String((rec && (rec as any).discordId) || payload.sub);
+      if (!ensuredUserId) throw new Error('Missing ensured user id');
     } catch (e) {
       res.status(400).send(`
         <h2>❌ Invalid Authorization Request</h2>
