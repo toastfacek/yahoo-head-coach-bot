@@ -48,6 +48,19 @@ app.use('/api/approvals', limiter);
 // API routes
 app.use('/api', router);
 
+// Debug routes for Railway
+app.get('/debug/routes', (req, res) => {
+  res.json({
+    message: 'Router loaded successfully',
+    availableRoutes: [
+      '/api/health',
+      '/api/oauth/start', 
+      '/api/oauth/callback',
+      '/api/oauth/session'
+    ]
+  });
+});
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
