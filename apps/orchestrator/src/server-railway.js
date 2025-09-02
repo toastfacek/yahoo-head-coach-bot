@@ -64,6 +64,27 @@ app.get('/api/oauth/start', (req, res) => {
   }
 });
 
+// Helper: verify HS256 JWT state and return payload
+function verifyStateJWT(token, secret) {
+  try {
+    const parts = String(token).split('.');
+    if (parts.length !== 3) throw new Error('bad_jwt');
+    const [hB64, pB64, sB64] = parts;
+    const base64urlToBuffer = (s) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+    // Recompute signature
+    const data = `${hB64}.${pB64}`;
+    const expected = require('crypto').createHmac('sha256', secret).update(data).digest();
+    const sig = base64urlToBuffer(sB64);
+    if (sig.length !== expected.length || !require('crypto').timingSafeEqual(sig, expected)) throw new Error('bad_sig');
+    const payloadJson = base64urlToBuffer(pB64).toString('utf8');
+    const payload = JSON.parse(payloadJson);
+    if (payload.exp && Math.floor(Date.now() / 1000) >= payload.exp) throw new Error('expired');
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
+
 // OAuth callback endpoint - handle Yahoo callback and exchange for tokens
 app.get('/api/oauth/callback', async (req, res) => {
   try {
@@ -88,9 +109,18 @@ app.get('/api/oauth/callback', async (req, res) => {
 
     // Exchange code for tokens
     const tokenResponse = await exchangeCodeForTokens(code);
-    
-    // For now, use simplified user creation (dev user)
-    const userId = 'dev'; // In production, this would be extracted from state
+
+    // Validate and extract Discord user ID from signed state
+    const secret = process.env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+    const payload = verifyStateJWT(state, secret);
+    if (!payload || payload.purpose !== 'yahoo_oauth' || !payload.sub) {
+      return res.status(400).send(`
+        <h2>❌ Invalid Authorization Request</h2>
+        <p>Invalid or expired state parameter</p>
+        <p>Please try authenticating again.</p>
+      `);
+    }
+    const userId = String(payload.sub);
     
     let user = await prisma.user.findUnique({
       where: { id: userId }
@@ -127,6 +157,19 @@ app.get('/api/oauth/callback', async (req, res) => {
         scope: tokenResponse.scope || 'fspt-w',
       },
     });
+
+    // Link Discord user mapping
+    try {
+      const discordId = userId;
+      const existing = await prisma.discordUser.findUnique({ where: { discordId } });
+      if (existing) {
+        await prisma.discordUser.update({ where: { discordId }, data: { userId: user.id, isAuthenticated: true } });
+      } else {
+        await prisma.discordUser.create({ data: { discordId, discordUsername: discordId, userId: user.id, isAuthenticated: true } });
+      }
+    } catch (linkErr) {
+      console.warn('Failed to link Discord user during OAuth callback:', linkErr);
+    }
 
     console.log(`OAuth tokens stored successfully for user: ${userId}`);
 
