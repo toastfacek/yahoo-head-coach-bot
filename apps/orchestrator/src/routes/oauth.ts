@@ -111,10 +111,13 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     }
 
     // Exchange authorization code for access token
+    console.log('[oauth-callback] Exchanging code for tokens...');
     const tokenResponse = await exchangeCodeForTokens(code as string);
+    console.log('[oauth-callback] Token exchange successful');
 
     // Create or find user (must be present from state/JWT)
     const userId = ensuredUserId as string;
+    console.log('[oauth-callback] Finding/creating user:', userId);
     let user = await prisma.user.findUnique({
       where: { id: userId },
     });
@@ -132,6 +135,7 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     const expiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000);
 
     // Store or update tokens in database
+    console.log('[oauth-callback] Storing tokens in database...');
     await prisma.yahooToken.upsert({
       where: { userId: user.id },
       update: {
@@ -152,6 +156,7 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     });
 
     // Link Discord user mapping and set as authenticated if present/needed
+    console.log('[oauth-callback] Linking Discord user...');
     try {
       // Upsert DiscordUser by discordId=userId
       const discordId = userId;

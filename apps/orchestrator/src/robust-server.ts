@@ -32,6 +32,7 @@ app.get('/api/health', (req, res) => {
     model: env.AI_MODEL,
     version: process.env.npm_package_version || '1.0.0',
     routes_loaded: (app as any).routesLoaded || false,
+    database_ready: (app as any).dbReady || false,
   });
 });
 
@@ -94,8 +95,18 @@ async function startServer() {
     console.log('✅ HTTP server is ready to accept connections');
   });
 
-  // Load routes asynchronously after server starts
+  // Load routes and database concurrently after server starts
   setTimeout(async () => {
+    // Start both route loading and database connection concurrently
+    const routesPromise = loadRoutes();
+    const dbPromise = connectToDatabase();
+    
+    // Wait for both to complete
+    await Promise.allSettled([routesPromise, dbPromise]);
+  }, 1000);
+
+  // Function to load routes
+  async function loadRoutes() {
     try {
       console.log('🔄 Loading routes asynchronously...');
       
@@ -131,30 +142,31 @@ async function startServer() {
       (app as any).routesLoaded = true;
       console.log('✅ All routes loaded successfully');
 
-      // Connect to database in background (non-blocking)
-      setTimeout(async () => {
-        try {
-          console.log('🔄 Connecting to database in background...');
-          const { connectDatabase, getDatabaseHealth } = await import('./db');
-          await connectDatabase();
-
-          const health = await getDatabaseHealth();
-          if (health.healthy) {
-            console.log(`✅ Database connection healthy (${health.latency}ms latency)`);
-          } else {
-            console.warn(`⚠️  Database connection unhealthy: ${health.error}`);
-          }
-        } catch (error) {
-          console.error('❌ Database connection failed:', error);
-          console.log('📝 Server continues with limited functionality');
-        }
-      }, 2000);
-
     } catch (error) {
       console.error('❌ Failed to load routes:', error);
       console.log('📝 Server continues with basic health endpoint only');
     }
-  }, 1000);
+  }
+
+  // Function to connect to database
+  async function connectToDatabase() {
+    try {
+      console.log('🔄 Connecting to database concurrently...');
+      const { connectDatabase, getDatabaseHealth } = await import('./db');
+      await connectDatabase();
+
+      const health = await getDatabaseHealth();
+      if (health.healthy) {
+        console.log(`✅ Database connection healthy (${health.latency}ms latency)`);
+        (app as any).dbReady = true;
+      } else {
+        console.warn(`⚠️  Database connection unhealthy: ${health.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Database connection failed:', error);
+      console.log('📝 Server continues with limited functionality (OAuth will fail)');
+    }
+  }
 
   return server;
 }
