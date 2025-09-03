@@ -25,12 +25,16 @@ vi.mock('../../db', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    discordUser: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
 // Mock the Yahoo service
 vi.mock('../../services/yahoo', () => ({
   yfForUser: vi.fn(),
+  createYahooClient: vi.fn(),
   getGameKey: vi.fn().mockResolvedValue('431'),
   leagueKeyFor: vi.fn().mockReturnValue('431.l.123456'),
   userTeamKey: vi.fn().mockResolvedValue('431.l.123456.t.1'),

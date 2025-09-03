@@ -24,14 +24,17 @@ export async function oauthStart(req: Request, res: Response): Promise<void> {
 
     // Validate the signed state minimally (do not consume here)
     try {
-      const secret = process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+      const secret =
+        process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
       const payload = verifyJWT<any>(String(state), secret);
       if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
       if (!payload.jti) throw new Error('Missing jti');
       // Do not require presence in stateStore at this step to avoid cross-instance issues
       console.log('[oauth-start] validated state', { jti: payload.jti, sub: payload.sub });
-    } catch (e) {
-      res.status(400).send('<h2>❌ Invalid Authorization Request</h2><p>Invalid or expired state parameter</p>');
+    } catch {
+      res
+        .status(400)
+        .send('<h2>❌ Invalid Authorization Request</h2><p>Invalid or expired state parameter</p>');
       return;
     }
 
@@ -47,7 +50,10 @@ export async function oauthStart(req: Request, res: Response): Promise<void> {
     res.redirect(authUrl.toString());
   } catch (error) {
     console.error('OAuth start error:', error);
-    res.status(500).json({ error: 'OAuth initialization failed', message: error instanceof Error ? error.message : 'Unknown error' });
+    res.status(500).json({
+      error: 'OAuth initialization failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 }
 
@@ -95,55 +101,73 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     try {
       console.log('[oauth-callback] Starting state validation...');
       console.log('[oauth-callback] State parameter:', state?.substring(0, 50) + '...');
-      
+
       // Try fallback state format first (base64url encoded JSON)
       try {
         const fallbackData = JSON.parse(Buffer.from(String(state), 'base64url').toString());
         if (fallbackData.fallback === true && fallbackData.discordId) {
-          console.log('[oauth-callback] Using fallback state format:', { discordId: fallbackData.discordId, timestamp: fallbackData.timestamp });
+          console.log('[oauth-callback] Using fallback state format:', {
+            discordId: fallbackData.discordId,
+            timestamp: fallbackData.timestamp,
+          });
           discordId = String(fallbackData.discordId);
           ensuredUserId = discordId; // For fallback, use Discord ID as user ID
-          console.log('[oauth-callback] Fallback state validation successful', { discordId, ensuredUserId });
+          console.log('[oauth-callback] Fallback state validation successful', {
+            discordId,
+            ensuredUserId,
+          });
         } else {
           throw new Error('Not fallback format');
         }
-      } catch (fallbackError) {
+      } catch {
         // Fallback failed, try JWT format
         console.log('[oauth-callback] Fallback state parsing failed, trying JWT format...');
-        
-        const secret = process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
-        console.log('[oauth-callback] Using secret:', secret === 'dev-oauth-secret' ? 'dev-default' : 'env-provided');
-        
+
+        const secret =
+          process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+        console.log(
+          '[oauth-callback] Using secret:',
+          secret === 'dev-oauth-secret' ? 'dev-default' : 'env-provided'
+        );
+
         const payload = verifyJWT<any>(String(state), secret);
-        console.log('[oauth-callback] JWT payload:', { 
-          purpose: payload.purpose, 
-          jti: payload.jti, 
-          sub: payload.sub, 
-          exp: payload.exp, 
-          iat: payload.iat 
+        console.log('[oauth-callback] JWT payload:', {
+          purpose: payload.purpose,
+          jti: payload.jti,
+          sub: payload.sub,
+          exp: payload.exp,
+          iat: payload.iat,
         });
-        
+
         if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
         if (!payload.jti) throw new Error('Missing jti');
-        
+
         console.log('[oauth-callback] Attempting to consume state from store...');
         const rec = await stateStore.consume(payload.jti);
         console.log('[oauth-callback] State store result:', rec ? 'found' : 'not found');
-        
+
         // Extract Discord ID from state store record or JWT subject
         discordId = String((rec && (rec as any).discordId) || payload.sub || '');
         ensuredUserId = discordId; // Use Discord ID as user ID for consistency
-        console.log('[oauth-callback] Derived discordId and ensuredUserId from JWT:', { discordId, ensuredUserId });
-        
+        console.log('[oauth-callback] Derived discordId and ensuredUserId from JWT:', {
+          discordId,
+          ensuredUserId,
+        });
+
         if (!discordId || discordId === 'dev') throw new Error('Missing Discord ID');
-        console.log('[oauth-callback] JWT state validation successful', { jti: payload.jti, discordId, ensuredUserId, hadState: !!rec });
+        console.log('[oauth-callback] JWT state validation successful', {
+          jti: payload.jti,
+          discordId,
+          ensuredUserId,
+          hadState: !!rec,
+        });
       }
     } catch (e) {
       console.error('[oauth-callback] State validation failed:', e);
       console.error('[oauth-callback] Error details:', {
         message: e instanceof Error ? e.message : 'Unknown error',
         state: state?.substring(0, 100),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
       res.status(400).send(`
         <h2>❌ Invalid Authorization Request</h2>
@@ -154,9 +178,16 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     }
 
     // Exchange authorization code for access token
-    console.log('[oauth-callback] Exchanging code for tokens...');
+    const exchangeStartTime = Date.now();
+    console.log('[oauth-callback] Exchanging code for tokens...', {
+      timestamp: new Date().toISOString(),
+    });
     const tokenResponse = await exchangeCodeForTokens(code as string);
-    console.log('[oauth-callback] Token exchange successful');
+    const exchangeEndTime = Date.now();
+    console.log('[oauth-callback] Token exchange successful', {
+      duration: exchangeEndTime - exchangeStartTime,
+      timestamp: new Date().toISOString(),
+    });
 
     // Create or find user (must be present from state/JWT)
     const userId = ensuredUserId as string;
@@ -202,7 +233,9 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     console.log('[oauth-callback] Linking Discord user...', { discordId, userId: user.id });
     try {
       if (!discordId) {
-        console.warn('[oauth-callback] No Discord ID available for linking, skipping Discord user creation');
+        console.warn(
+          '[oauth-callback] No Discord ID available for linking, skipping Discord user creation'
+        );
       } else {
         // Upsert DiscordUser by the actual discordId from state
         const existing = await prisma.discordUser.findUnique({ where: { discordId } });
@@ -244,11 +277,40 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     `);
   } catch (error) {
     console.error('OAuth callback error:', error);
-    res.status(500).send(`
-      <h2>❌ OAuth Processing Failed</h2>
-      <p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
-      <p>Please try authenticating again.</p>
-    `);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Provide specific guidance for authorization code expiration
+    if (errorMessage.includes('expired')) {
+      res.status(400).send(`
+        <h2>⏰ Authorization Expired</h2>
+        <p><strong>The authorization code expired before it could be processed.</strong></p>
+        <p>This happens when there's too much delay between clicking the auth link and completing the Yahoo OAuth flow.</p>
+        <h3>To fix this:</h3>
+        <ol>
+          <li>Go back to Discord and run <code>/auth login</code> again</li>
+          <li>Click the authentication link <strong>immediately</strong></li>
+          <li>Complete the Yahoo login process quickly</li>
+          <li>Don't switch between tabs or apps during the process</li>
+        </ol>
+        <p><strong>Tip:</strong> The entire process should take less than 1-2 minutes.</p>
+        <script>
+          setTimeout(() => {
+            window.close();
+          }, 10000);
+        </script>
+      `);
+    } else {
+      res.status(500).send(`
+        <h2>❌ OAuth Processing Failed</h2>
+        <p>Error: ${errorMessage}</p>
+        <p>Please try authenticating again.</p>
+        <script>
+          setTimeout(() => {
+            window.close();
+          }, 5000);
+        </script>
+      `);
+    }
   }
 }
 
@@ -359,9 +421,20 @@ async function exchangeCodeForTokens(code: string) {
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error('Yahoo token exchange error:', error.response?.data);
-      throw new Error(
-        `Token exchange failed: ${error.response?.data?.error_description || error.message}`
-      );
+      const errorDescription = error.response?.data?.error_description || error.message;
+
+      // Handle specific error types
+      if (error.response?.data?.error === 'invalid_grant') {
+        if (errorDescription.includes('expired')) {
+          throw new Error(
+            'Authorization code expired. Please try authenticating again immediately after clicking the link.'
+          );
+        } else {
+          throw new Error('Authorization code is invalid. Please try authenticating again.');
+        }
+      }
+
+      throw new Error(`Token exchange failed: ${errorDescription}`);
     }
     throw error;
   }

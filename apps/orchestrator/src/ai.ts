@@ -18,8 +18,11 @@ export function getModel() {
 }
 
 // Legacy export for backwards compatibility - will initialize on first access
-export const model = new Proxy({}, {
-  get(target, prop) {
-    return getModel()[prop];
+export const model = new Proxy(
+  {},
+  {
+    get(target, prop) {
+      return getModel()[prop];
+    },
   }
-});
+);
