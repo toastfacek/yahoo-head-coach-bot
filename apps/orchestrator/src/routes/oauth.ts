@@ -327,9 +327,13 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
     }
     const rawUserId = String(parsed.data.userId);
     // Allow passing a Discord ID; map to internal userId if a DiscordUser exists
+    console.log('[tokenStatus] Looking up Discord user mapping for:', rawUserId);
     const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
+    console.log('[tokenStatus] Discord mapping found:', map ? { discordId: map.discordId, userId: map.userId } : 'none');
     const userId = map?.userId || rawUserId;
+    console.log('[tokenStatus] Final userId for token lookup:', userId);
     const tok = await prisma.yahooToken.findUnique({ where: { userId } });
+    console.log('[tokenStatus] Token found:', tok ? { userId: tok.userId, expiresAt: tok.expiresAt } : 'none');
     if (!tok) {
       res.json({ authenticated: false, userId });
       return;
