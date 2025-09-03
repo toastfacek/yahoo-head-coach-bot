@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Increase Node.js memory limit
-ENV NODE_OPTIONS="--max-old-space-size=2048"
+# Increase Node.js memory limit (can be overridden by env vars)
+ENV NODE_OPTIONS="--max-old-space-size=8192"
 
 WORKDIR /app
 

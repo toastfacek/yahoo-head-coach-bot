@@ -1,12 +1,15 @@
 // Load environment variables first
+console.log('🔄 Loading environment configuration...');
 import 'dotenv/config';
 
+console.log('🔄 Importing dependencies...');
 import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 
+console.log('🔄 Loading configuration...');
 import { env, allowedOrigins } from './config/env';
 import { connectDatabase, getDatabaseHealth, disconnectDatabase } from './db';
 console.log('🔄 Importing routes...');
@@ -93,13 +96,19 @@ app.use((error: any, req: express.Request, res: express.Response, _next: express
 
 // Start server immediately, connect to database in background
 async function startServer() {
+  console.log('🔄 Starting server initialization...');
+  console.log(`🔧 NODE_OPTIONS: ${process.env.NODE_OPTIONS}`);
+  console.log(`🔧 Memory limit: ${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`);
+  console.log(`🔧 Port configuration: ${PORT} (from ${process.env.PORT ? 'env.PORT' : 'default'})`);
+  
   // Start HTTP server first (non-blocking)
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 HeadCoach Orchestrator server running on port ${PORT}`);
-    console.log(`📊 Health check available at: http://localhost:${PORT}/api/health`);
+    console.log(`📊 Health check available at: http://0.0.0.0:${PORT}/api/health`);
     console.log(
       `📈 Environment: ${env.NODE_ENV} | Model: ${env.AI_MODEL} | Mode: ${env.EXECUTION_MODE}`
     );
+    console.log('✅ HTTP server is ready to accept connections');
   });
 
   // Connect to database in background (non-blocking)
@@ -124,8 +133,12 @@ async function startServer() {
   return server;
 }
 
+console.log('🚀 Initiating server startup...');
+
 startServer()
   .then((server) => {
+    console.log('✅ Server startup completed successfully');
+    
     // Handle graceful shutdown
     process.on('SIGTERM', async () => {
       console.log('SIGTERM received, shutting down gracefully...');
@@ -146,7 +159,13 @@ startServer()
     });
   })
   .catch((error) => {
-    console.error('Failed to start server:', error);
+    console.error('❌ CRITICAL: Failed to start server:', error);
+    console.error('Stack trace:', error.stack);
+    console.error('Environment debug:', {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      NODE_OPTIONS: process.env.NODE_OPTIONS
+    });
     process.exit(1);
   });
 
