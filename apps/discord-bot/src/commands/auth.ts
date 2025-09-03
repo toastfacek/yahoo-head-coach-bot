@@ -77,16 +77,11 @@ async function handleLogin(
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     }
 
-    // Direct Yahoo OAuth URL construction (bypassing orchestrator)
-    const yahooClientId = process.env.YAHOO_CLIENT_ID || 'your-yahoo-client-id';
-    const redirectUri = process.env.YAHOO_REDIRECT_URI || 'https://your-app.railway.app/api/oauth/callback';
+    // Use orchestrator to create proper OAuth session with JWT state
+    authLogger.info({ discordId }, 'Creating OAuth session via orchestrator');
+    const authUrl = await orchestratorApi.createOAuthSession(discordId);
+    authLogger.info({ discordId, authUrlGenerated: !!authUrl }, 'OAuth session created successfully');
     
-    const authUrl = `https://api.login.yahoo.com/oauth2/request_auth?` +
-      `client_id=${encodeURIComponent(yahooClientId)}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `response_type=code&` +
-      `scope=fspt-w&` +
-      `state=${encodeURIComponent(discordId)}`;
     const embed = new EmbedBuilder()
       .setTitle('Connect Yahoo Fantasy Football')
       .setDescription('Authorize the bot to access your Yahoo Fantasy data. You can revoke access at any time in Yahoo settings.')
