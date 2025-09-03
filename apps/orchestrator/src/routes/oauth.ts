@@ -91,6 +91,7 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
 
     // Validate state parameter (CSRF protection)
     let ensuredUserId: string | null = null;
+    let discordId: string | null = null;
     try {
       console.log('[oauth-callback] Starting state validation...');
       console.log('[oauth-callback] State parameter:', state?.substring(0, 50) + '...');
@@ -100,8 +101,9 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
         const fallbackData = JSON.parse(Buffer.from(String(state), 'base64url').toString());
         if (fallbackData.fallback === true && fallbackData.discordId) {
           console.log('[oauth-callback] Using fallback state format:', { discordId: fallbackData.discordId, timestamp: fallbackData.timestamp });
-          ensuredUserId = String(fallbackData.discordId);
-          console.log('[oauth-callback] Fallback state validation successful', { ensuredUserId });
+          discordId = String(fallbackData.discordId);
+          ensuredUserId = discordId; // For fallback, use Discord ID as user ID
+          console.log('[oauth-callback] Fallback state validation successful', { discordId, ensuredUserId });
         } else {
           throw new Error('Not fallback format');
         }
@@ -128,12 +130,13 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
         const rec = await stateStore.consume(payload.jti);
         console.log('[oauth-callback] State store result:', rec ? 'found' : 'not found');
         
-        // If rec is missing (e.g., different instance), fall back to JWT subject
-        ensuredUserId = String((rec && (rec as any).discordId) || payload.sub || '');
-        console.log('[oauth-callback] Derived ensuredUserId from JWT:', ensuredUserId);
+        // Extract Discord ID from state store record or JWT subject
+        discordId = String((rec && (rec as any).discordId) || payload.sub || '');
+        ensuredUserId = discordId; // Use Discord ID as user ID for consistency
+        console.log('[oauth-callback] Derived discordId and ensuredUserId from JWT:', { discordId, ensuredUserId });
         
-        if (!ensuredUserId || ensuredUserId === 'dev') throw new Error('Missing ensured user id');
-        console.log('[oauth-callback] JWT state validation successful', { jti: payload.jti, ensuredUserId, hadState: !!rec });
+        if (!discordId || discordId === 'dev') throw new Error('Missing Discord ID');
+        console.log('[oauth-callback] JWT state validation successful', { jti: payload.jti, discordId, ensuredUserId, hadState: !!rec });
       }
     } catch (e) {
       console.error('[oauth-callback] State validation failed:', e);
@@ -196,28 +199,34 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     });
 
     // Link Discord user mapping and set as authenticated if present/needed
-    console.log('[oauth-callback] Linking Discord user...');
+    console.log('[oauth-callback] Linking Discord user...', { discordId, userId: user.id });
     try {
-      // Upsert DiscordUser by discordId=userId
-      const discordId = userId;
-      const existing = await prisma.discordUser.findUnique({ where: { discordId } });
-      if (existing) {
-        await prisma.discordUser.update({
-          where: { discordId },
-          data: { userId: user.id, isAuthenticated: true },
-        });
+      if (!discordId) {
+        console.warn('[oauth-callback] No Discord ID available for linking, skipping Discord user creation');
       } else {
-        await prisma.discordUser.create({
-          data: {
-            discordId,
-            discordUsername: discordId,
-            userId: user.id,
-            isAuthenticated: true,
-          },
-        });
+        // Upsert DiscordUser by the actual discordId from state
+        const existing = await prisma.discordUser.findUnique({ where: { discordId } });
+        if (existing) {
+          console.log('[oauth-callback] Updating existing Discord user record');
+          await prisma.discordUser.update({
+            where: { discordId },
+            data: { userId: user.id, isAuthenticated: true },
+          });
+        } else {
+          console.log('[oauth-callback] Creating new Discord user record');
+          await prisma.discordUser.create({
+            data: {
+              discordId,
+              discordUsername: discordId, // Default to Discord ID, can be updated later
+              userId: user.id,
+              isAuthenticated: true,
+            },
+          });
+        }
+        console.log('[oauth-callback] Discord user linking successful');
       }
     } catch (linkErr) {
-      console.warn('Failed to link Discord user during OAuth callback:', linkErr);
+      console.error('Failed to link Discord user during OAuth callback:', linkErr);
     }
 
     console.log(`OAuth tokens stored and user linked successfully for user: ${userId}`);

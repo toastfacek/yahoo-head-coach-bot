@@ -180,8 +180,8 @@ async function handleStatus(interaction: ChatInputCommandInteraction, discordId:
     let statusColor: number;
 
     if (isAuth && user?.yahooUserId) {
-      // Double-check with orchestrator
-      const oauthStatus = await orchestratorApi.checkOAuthStatus(user.yahooUserId);
+      // Double-check with orchestrator using Discord ID
+      const oauthStatus = await orchestratorApi.checkOAuthStatus(discordId);
       
       if (oauthStatus.authenticated) {
         statusDescription = 
