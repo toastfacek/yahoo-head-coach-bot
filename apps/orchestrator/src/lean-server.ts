@@ -43,14 +43,46 @@ app.get('/api', (req, res) => {
   res.status(200).json({
     message: 'Yahoo Fantasy Football HeadCoach API - Lean Version',
     version: '1.0.0-lean',
+    oauthLoaded,
     endpoints: {
       health: '/api/health',
       oauth: {
         start: '/api/oauth/start',
-        callback: '/api/oauth/callback',
+        callback: '/api/oauth/callback', 
         status: '/api/oauth/status'
-      }
+      },
+      debug: '/api/debug/routes'
     },
+  });
+});
+
+// Debug endpoint to list registered routes
+app.get('/api/debug/routes', (req, res) => {
+  const routes: any[] = [];
+  
+  app._router?.stack?.forEach((middleware: any) => {
+    if (middleware.route) {
+      // Direct routes
+      const path = middleware.route.path;
+      const methods = Object.keys(middleware.route.methods);
+      routes.push({ path, methods });
+    } else if (middleware.name === 'router') {
+      // Router middleware
+      middleware.handle?.stack?.forEach((handler: any) => {
+        if (handler.route) {
+          const path = handler.route.path;
+          const methods = Object.keys(handler.route.methods);
+          routes.push({ path, methods });
+        }
+      });
+    }
+  });
+
+  res.json({
+    oauthLoaded,
+    routeCount: routes.length,
+    routes: routes.sort((a, b) => a.path.localeCompare(b.path)),
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -62,15 +94,46 @@ async function loadOAuthRoutes() {
     
     // Import OAuth functions directly to avoid loading all routes
     const oauth = await import('./routes/oauth');
+    console.log('🔄 OAuth module imported, registering routes...');
+    
+    // Verify functions exist before registering
+    if (!oauth.oauthStart || !oauth.oauthCallback || !oauth.tokenStatus || !oauth.refreshNow) {
+      throw new Error('Missing OAuth functions in import');
+    }
     
     // OAuth endpoints - critical for Discord login
     app.get('/api/oauth/start', oauth.oauthStart);
+    console.log('✅ Registered: GET /api/oauth/start');
+    
     app.get('/api/oauth/callback', oauth.oauthCallback);
+    console.log('✅ Registered: GET /api/oauth/callback');
+    
     app.get('/api/oauth/status', oauth.tokenStatus);
+    console.log('✅ Registered: GET /api/oauth/status');
+    
     app.get('/api/oauth/refresh', oauth.refreshNow);
+    console.log('✅ Registered: GET /api/oauth/refresh');
     
     oauthLoaded = true;
-    console.log('✅ OAuth routes loaded successfully');
+    console.log('✅ All OAuth routes loaded successfully');
+    
+    // Register 404 handler AFTER OAuth routes are loaded
+    app.use('*', (req, res) => {
+      res.status(404).json({
+        error: 'Not Found',
+        message: `Route ${req.originalUrl} not found`,
+        availableEndpoints: {
+          health: '/api/health',
+          oauth: {
+            start: '/api/oauth/start?state=JWT_TOKEN',
+            callback: '/api/oauth/callback',
+            status: '/api/oauth/status'
+          },
+          debug: '/api/debug/routes'
+        },
+      });
+    });
+    console.log('✅ 404 handler registered after OAuth routes');
     
     // Connect to database after OAuth routes are ready
     setTimeout(async () => {
@@ -96,28 +159,25 @@ async function loadOAuthRoutes() {
   }
 }
 
-// Basic 404 handler
-app.use('*', (req, res) => {
+// Temporary 404 handler for pre-OAuth loading period
+app.use('*', (req, res, next) => {
   if (!oauthLoaded && req.path.includes('/oauth/')) {
     res.status(503).json({
       error: 'Service Loading',
       message: 'OAuth routes are still loading. Please try again in a few seconds.',
     });
-  } else if (!oauthLoaded) {
+  } else if (!oauthLoaded && !req.path.match(/^\/(api\/health|api\/debug\/routes|api)$/)) {
     res.status(503).json({
-      error: 'Service Loading', 
-      message: 'Server is still initializing. Only health endpoint available.',
-      availableEndpoints: { health: '/api/health' },
-    });
-  } else {
-    res.status(404).json({
-      error: 'Not Found',
-      message: `Route ${req.originalUrl} not found`,
-      availableEndpoints: {
+      error: 'Service Loading',
+      message: 'Server is still initializing. Limited endpoints available.',
+      availableEndpoints: { 
         health: '/api/health',
-        oauth: '/api/oauth/start?state=JWT_TOKEN',
+        debug: '/api/debug/routes'
       },
     });
+  } else {
+    // Let the request continue to other routes
+    next();
   }
 });
 
