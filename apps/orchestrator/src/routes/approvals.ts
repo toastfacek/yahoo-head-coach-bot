@@ -100,14 +100,12 @@ export async function approve(req: Request, res: Response): Promise<void> {
       ]);
       const reason = execRes?.reason ?? '';
       const statusCode = badRequestReasons.has(reason) ? 400 : 500;
-      return void res
-        .status(statusCode)
-        .json({
-          success: false,
-          error: 'Yahoo API execution failed',
-          reason: execRes?.reason,
-          details: execRes,
-        });
+      return void res.status(statusCode).json({
+        success: false,
+        error: 'Yahoo API execution failed',
+        reason: execRes?.reason,
+        details: execRes,
+      });
     }
   } catch (error: any) {
     console.error('Approval execution error:', error);

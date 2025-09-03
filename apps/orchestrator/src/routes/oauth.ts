@@ -50,12 +50,10 @@ export async function oauthStart(req: Request, res: Response): Promise<void> {
     res.redirect(authUrl.toString());
   } catch (error) {
     console.error('OAuth start error:', error);
-    res
-      .status(500)
-      .json({
-        error: 'OAuth initialization failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
+    res.status(500).json({
+      error: 'OAuth initialization failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 }
 
