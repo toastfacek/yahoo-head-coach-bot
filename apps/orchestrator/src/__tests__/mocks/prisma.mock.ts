@@ -84,7 +84,10 @@ export function setupPrismaMocks() {
   mockPrismaClient.recommendation.findMany.mockResolvedValue([mockRecommendation]);
   // Default return null for discordUser mapping (most tests don't need mapping)
   mockPrismaClient.discordUser.findUnique.mockResolvedValue(null);
-  mockPrismaClient.user.findUnique.mockResolvedValue({ id: 'test-user-1', email: 'test@example.com' });
+  mockPrismaClient.user.findUnique.mockResolvedValue({
+    id: 'test-user-1',
+    email: 'test@example.com',
+  });
   mockPrismaClient.league.findUnique.mockResolvedValue({ id: '123456', name: 'Test League' });
 }
 

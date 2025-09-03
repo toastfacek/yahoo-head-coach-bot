@@ -84,7 +84,7 @@ async function startServer() {
   console.log(`🔧 NODE_OPTIONS: ${process.env.NODE_OPTIONS}`);
   console.log(`🔧 Memory limit: ${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`);
   console.log(`🔧 Port configuration: ${PORT} (from ${process.env.PORT ? 'env.PORT' : 'default'})`);
-  
+
   // Start HTTP server first (non-blocking)
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 HeadCoach Orchestrator server running on port ${PORT}`);
@@ -100,7 +100,7 @@ async function startServer() {
     // Start both route loading and database connection concurrently
     const routesPromise = loadRoutes();
     const dbPromise = connectToDatabase();
-    
+
     // Wait for both to complete
     await Promise.allSettled([routesPromise, dbPromise]);
   }, 1000);
@@ -109,11 +109,11 @@ async function startServer() {
   async function loadRoutes() {
     try {
       console.log('🔄 Loading routes asynchronously...');
-      
+
       // Import additional middleware
       const rateLimit = (await import('express-rate-limit')).default;
       const pinoHttp = (await import('pino-http')).default;
-      
+
       // Add additional middleware
       app.use(
         pinoHttp({
@@ -138,10 +138,9 @@ async function startServer() {
       console.log('🔄 Importing full route configuration...');
       const { default: router } = await import('./routes');
       app.use('/api', router);
-      
+
       (app as any).routesLoaded = true;
       console.log('✅ All routes loaded successfully');
-
     } catch (error) {
       console.error('❌ Failed to load routes:', error);
       console.log('📝 Server continues with basic health endpoint only');
@@ -176,7 +175,7 @@ console.log('🚀 Initiating server startup...');
 startServer()
   .then((server) => {
     console.log('✅ Server startup completed successfully');
-    
+
     // Handle graceful shutdown
     process.on('SIGTERM', async () => {
       console.log('SIGTERM received, shutting down gracefully...');
@@ -212,7 +211,7 @@ startServer()
     console.error('Environment debug:', {
       NODE_ENV: process.env.NODE_ENV,
       PORT: process.env.PORT,
-      NODE_OPTIONS: process.env.NODE_OPTIONS
+      NODE_OPTIONS: process.env.NODE_OPTIONS,
     });
     process.exit(1);
   });

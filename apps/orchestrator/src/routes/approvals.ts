@@ -15,9 +15,7 @@ export async function listPending(req: Request, res: Response): Promise<void> {
   const Query = z.object({ leagueId: z.string().min(1) });
   const parsed = Query.safeParse(req.query);
   if (!parsed.success)
-    return void res
-      .status(400)
-      .json({ error: 'Invalid query', details: parsed.error.flatten() });
+    return void res.status(400).json({ error: 'Invalid query', details: parsed.error.flatten() });
   const { leagueId } = parsed.data;
   const recs = await prisma.recommendation.findMany({
     where: { leagueId, status: 'STAGED' },
@@ -45,9 +43,7 @@ const ApproveBody = z.object({
 export async function approve(req: Request, res: Response): Promise<void> {
   const parsed = ApproveBody.safeParse(req.body);
   if (!parsed.success)
-    return void res
-      .status(400)
-      .json({ error: 'Invalid body', details: parsed.error.flatten() });
+    return void res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });
 
   const { id, userId: rawUserId } = parsed.data;
   // Map Discord ID to internal userId if applicable
@@ -57,9 +53,7 @@ export async function approve(req: Request, res: Response): Promise<void> {
   if (!rec) return void res.status(404).json({ error: 'Not found' });
 
   if (rec.status !== 'STAGED') {
-    return void res
-      .status(400)
-      .json({ error: 'Recommendation is not staged for approval' });
+    return void res.status(400).json({ error: 'Recommendation is not staged for approval' });
   }
 
   try {
@@ -71,9 +65,7 @@ export async function approve(req: Request, res: Response): Promise<void> {
     const teamKey = await userTeamKey(direct, gameKey, leagueKey);
 
     if (!teamKey) {
-      return void res
-        .status(400)
-        .json({ error: 'Could not find team key for user in league' });
+      return void res.status(400).json({ error: 'Could not find team key for user in league' });
     }
 
     const execRes = await callYahoo({
@@ -110,7 +102,12 @@ export async function approve(req: Request, res: Response): Promise<void> {
       const statusCode = badRequestReasons.has(reason) ? 400 : 500;
       return void res
         .status(statusCode)
-        .json({ success: false, error: 'Yahoo API execution failed', reason: execRes?.reason, details: execRes });
+        .json({
+          success: false,
+          error: 'Yahoo API execution failed',
+          reason: execRes?.reason,
+          details: execRes,
+        });
     }
   } catch (error: any) {
     console.error('Approval execution error:', error);
@@ -125,9 +122,7 @@ const RejectBody = z.object({ id: z.string().min(1) });
 export async function reject(req: Request, res: Response): Promise<void> {
   const parsed = RejectBody.safeParse(req.body);
   if (!parsed.success)
-    return void res
-      .status(400)
-      .json({ error: 'Invalid body', details: parsed.error.flatten() });
+    return void res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });
   const { id } = parsed.data;
   await prisma.recommendation.update({ where: { id }, data: { status: 'REJECTED' } });
   return void res.json({ success: true, ok: true });

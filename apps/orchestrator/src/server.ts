@@ -65,10 +65,10 @@ app.get('/debug/routes', (req, res) => {
     message: 'Router loaded successfully',
     availableRoutes: [
       '/api/health',
-      '/api/oauth/start', 
+      '/api/oauth/start',
       '/api/oauth/callback',
-      '/api/oauth/session'
-    ]
+      '/api/oauth/session',
+    ],
   });
 });
 
@@ -100,7 +100,7 @@ async function startServer() {
   console.log(`🔧 NODE_OPTIONS: ${process.env.NODE_OPTIONS}`);
   console.log(`🔧 Memory limit: ${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`);
   console.log(`🔧 Port configuration: ${PORT} (from ${process.env.PORT ? 'env.PORT' : 'default'})`);
-  
+
   // Start HTTP server first (non-blocking)
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 HeadCoach Orchestrator server running on port ${PORT}`);
@@ -138,7 +138,7 @@ console.log('🚀 Initiating server startup...');
 startServer()
   .then((server) => {
     console.log('✅ Server startup completed successfully');
-    
+
     // Handle graceful shutdown
     process.on('SIGTERM', async () => {
       console.log('SIGTERM received, shutting down gracefully...');
@@ -164,7 +164,7 @@ startServer()
     console.error('Environment debug:', {
       NODE_ENV: process.env.NODE_ENV,
       PORT: process.env.PORT,
-      NODE_OPTIONS: process.env.NODE_OPTIONS
+      NODE_OPTIONS: process.env.NODE_OPTIONS,
     });
     process.exit(1);
   });

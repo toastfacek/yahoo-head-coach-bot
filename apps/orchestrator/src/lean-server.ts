@@ -34,7 +34,7 @@ app.get('/api/health', (req, res) => {
       heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB',
       heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + 'MB',
       rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
-    }
+    },
   });
 });
 
@@ -48,10 +48,10 @@ app.get('/api', (req, res) => {
       health: '/api/health',
       oauth: {
         start: '/api/oauth/start',
-        callback: '/api/oauth/callback', 
-        status: '/api/oauth/status'
+        callback: '/api/oauth/callback',
+        status: '/api/oauth/status',
       },
-      debug: '/api/debug/routes'
+      debug: '/api/debug/routes',
     },
   });
 });
@@ -59,7 +59,7 @@ app.get('/api', (req, res) => {
 // Debug endpoint to list registered routes
 app.get('/api/debug/routes', (req, res) => {
   const routes: any[] = [];
-  
+
   app._router?.stack?.forEach((middleware: any) => {
     if (middleware.route) {
       // Direct routes
@@ -82,7 +82,7 @@ app.get('/api/debug/routes', (req, res) => {
     oauthLoaded,
     routeCount: routes.length,
     routes: routes.sort((a, b) => a.path.localeCompare(b.path)),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -91,12 +91,12 @@ let oauthLoaded = false;
 async function loadOAuthRoutes() {
   try {
     console.log('🔄 Loading OAuth routes...');
-    
+
     // Import OAuth functions directly to avoid loading all routes
     const oauth = await import('./routes/oauth');
     const oauthSession = await import('./routes/oauth-session');
     console.log('🔄 OAuth modules imported, registering routes...');
-    
+
     // Verify functions exist before registering
     if (!oauth.oauthStart || !oauth.oauthCallback || !oauth.tokenStatus || !oauth.refreshNow) {
       throw new Error('Missing OAuth functions in import');
@@ -104,26 +104,26 @@ async function loadOAuthRoutes() {
     if (!oauthSession.createOAuthSession) {
       throw new Error('Missing OAuth session function in import');
     }
-    
+
     // OAuth endpoints - critical for Discord login
     app.get('/api/oauth/start', oauth.oauthStart);
     console.log('✅ Registered: GET /api/oauth/start');
-    
+
     app.get('/api/oauth/callback', oauth.oauthCallback);
     console.log('✅ Registered: GET /api/oauth/callback');
-    
+
     app.get('/api/oauth/status', oauth.tokenStatus);
     console.log('✅ Registered: GET /api/oauth/status');
-    
+
     app.get('/api/oauth/refresh', oauth.refreshNow);
     console.log('✅ Registered: GET /api/oauth/refresh');
-    
+
     app.post('/api/oauth/session', oauthSession.createOAuthSession);
     console.log('✅ Registered: POST /api/oauth/session');
-    
+
     oauthLoaded = true;
     console.log('✅ All OAuth routes loaded successfully');
-    
+
     // Register 404 handler AFTER OAuth routes are loaded
     app.use('*', (req, res) => {
       res.status(404).json({
@@ -134,21 +134,21 @@ async function loadOAuthRoutes() {
           oauth: {
             start: '/api/oauth/start?state=JWT_TOKEN',
             callback: '/api/oauth/callback',
-            status: '/api/oauth/status'
+            status: '/api/oauth/status',
           },
-          debug: '/api/debug/routes'
+          debug: '/api/debug/routes',
         },
       });
     });
     console.log('✅ 404 handler registered after OAuth routes');
-    
+
     // Connect to database after OAuth routes are ready
     setTimeout(async () => {
       try {
         console.log('🔄 Connecting to database...');
         const { connectDatabase, getDatabaseHealth } = await import('./db');
         await connectDatabase();
-        
+
         const health = await getDatabaseHealth();
         if (health.healthy) {
           console.log(`✅ Database ready (${health.latency}ms latency)`);
@@ -160,7 +160,6 @@ async function loadOAuthRoutes() {
         console.log('📝 OAuth will fail until database is available');
       }
     }, 500);
-    
   } catch (error) {
     console.error('❌ Failed to load OAuth routes:', error);
   }
@@ -177,9 +176,9 @@ app.use('*', (req, res, next) => {
     res.status(503).json({
       error: 'Service Loading',
       message: 'Server is still initializing. Limited endpoints available.',
-      availableEndpoints: { 
+      availableEndpoints: {
         health: '/api/health',
-        debug: '/api/debug/routes'
+        debug: '/api/debug/routes',
       },
     });
   } else {
@@ -199,14 +198,16 @@ app.use((error: any, req: express.Request, res: express.Response, _next: express
 
 async function startServer() {
   console.log('🚀 Starting lean HTTP server...');
-  
+
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Server running on port ${PORT}`);
     console.log(`📊 Health: http://0.0.0.0:${PORT}/api/health`);
     console.log(`🔐 OAuth: http://0.0.0.0:${PORT}/api/oauth/start`);
-    
+
     const memUsage = process.memoryUsage();
-    console.log(`💾 Memory: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB used of ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`);
+    console.log(
+      `💾 Memory: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB used of ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`
+    );
   });
 
   // Load OAuth routes after server is running

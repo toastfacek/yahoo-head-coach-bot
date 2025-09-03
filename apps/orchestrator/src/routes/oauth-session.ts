@@ -14,7 +14,8 @@ export async function createOAuthSession(req: Request, res: Response): Promise<v
   }
 
   const { discordId } = parsed.data;
-  const secret = process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+  const secret =
+    process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
   const kid = process.env.JWT_KID || env.JWT_KID || undefined;
 
   const iat = Math.floor(Date.now() / 1000);
@@ -32,12 +33,12 @@ export async function createOAuthSession(req: Request, res: Response): Promise<v
   const base = `${proto}://${host}`;
   const authorize_url = `${base}/api/oauth/start?state=${encodeURIComponent(token)}`;
 
-  console.log('[oauth-session] created', { 
-    jti, 
-    sub: discordId, 
-    exp, 
+  console.log('[oauth-session] created', {
+    jti,
+    sub: discordId,
+    exp,
     expiresInMinutes: (exp - iat) / 60,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
   res.json({ authorize_url });
 }
