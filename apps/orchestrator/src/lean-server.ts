@@ -94,11 +94,15 @@ async function loadOAuthRoutes() {
     
     // Import OAuth functions directly to avoid loading all routes
     const oauth = await import('./routes/oauth');
-    console.log('🔄 OAuth module imported, registering routes...');
+    const oauthSession = await import('./routes/oauth-session');
+    console.log('🔄 OAuth modules imported, registering routes...');
     
     // Verify functions exist before registering
     if (!oauth.oauthStart || !oauth.oauthCallback || !oauth.tokenStatus || !oauth.refreshNow) {
       throw new Error('Missing OAuth functions in import');
+    }
+    if (!oauthSession.createOAuthSession) {
+      throw new Error('Missing OAuth session function in import');
     }
     
     // OAuth endpoints - critical for Discord login
@@ -113,6 +117,9 @@ async function loadOAuthRoutes() {
     
     app.get('/api/oauth/refresh', oauth.refreshNow);
     console.log('✅ Registered: GET /api/oauth/refresh');
+    
+    app.post('/api/oauth/session', oauthSession.createOAuthSession);
+    console.log('✅ Registered: POST /api/oauth/session');
     
     oauthLoaded = true;
     console.log('✅ All OAuth routes loaded successfully');
