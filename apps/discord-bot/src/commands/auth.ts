@@ -77,6 +77,15 @@ async function handleLogin(
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     }
 
+    // Check orchestrator health first
+    authLogger.info({ discordId }, 'Checking orchestrator health before OAuth session creation');
+    const isHealthy = await orchestratorApi.healthCheck();
+    
+    if (!isHealthy) {
+      authLogger.error({ discordId }, 'Orchestrator health check failed');
+      throw new Error('Authentication service is currently unavailable. Please try again later.');
+    }
+    
     // Use orchestrator to create proper OAuth session with JWT state
     authLogger.info({ discordId }, 'Creating OAuth session via orchestrator');
     let authUrl: string;
