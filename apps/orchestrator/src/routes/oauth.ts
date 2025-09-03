@@ -30,7 +30,7 @@ export async function oauthStart(req: Request, res: Response): Promise<void> {
       if (!payload.jti) throw new Error('Missing jti');
       // Do not require presence in stateStore at this step to avoid cross-instance issues
       console.log('[oauth-start] validated state', { jti: payload.jti, sub: payload.sub });
-    } catch (e) {
+    } catch {
       res.status(400).send('<h2>❌ Invalid Authorization Request</h2><p>Invalid or expired state parameter</p>');
       return;
     }
@@ -107,7 +107,7 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
         } else {
           throw new Error('Not fallback format');
         }
-      } catch (fallbackError) {
+      } catch {
         // Fallback failed, try JWT format
         console.log('[oauth-callback] Fallback state parsing failed, trying JWT format...');
         
