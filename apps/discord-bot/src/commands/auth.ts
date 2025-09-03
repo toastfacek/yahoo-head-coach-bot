@@ -79,8 +79,14 @@ async function handleLogin(
 
     // Use orchestrator to create proper OAuth session with JWT state
     authLogger.info({ discordId }, 'Creating OAuth session via orchestrator');
-    const authUrl = await orchestratorApi.createOAuthSession(discordId);
-    authLogger.info({ discordId, authUrlGenerated: !!authUrl }, 'OAuth session created successfully');
+    let authUrl: string;
+    try {
+      authUrl = await orchestratorApi.createOAuthSession(discordId);
+      authLogger.info({ discordId, authUrlGenerated: !!authUrl }, 'OAuth session created successfully');
+    } catch (sessionError) {
+      authLogger.error({ error: sessionError, discordId }, 'Failed to create OAuth session via orchestrator');
+      throw new Error(`OAuth session creation failed: ${sessionError instanceof Error ? sessionError.message : 'Unknown error'}`);
+    }
     
     const embed = new EmbedBuilder()
       .setTitle('Connect Yahoo Fantasy Football')

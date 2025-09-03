@@ -62,12 +62,31 @@ export class OrchestratorApiService {
 
   async createOAuthSession(discordId: string): Promise<string> {
     try {
+      apiLogger.debug({ discordId, url: this.api.defaults.baseURL }, 'Attempting to create OAuth session');
       const response = await this.api.post('/oauth/session', { discordId });
+      apiLogger.debug({ discordId, status: response.status, hasData: !!response.data }, 'OAuth session response received');
+      
       const url = response.data?.authorize_url;
-      if (!url) throw new Error('Missing authorize_url');
+      if (!url) {
+        apiLogger.error({ discordId, responseData: response.data }, 'Missing authorize_url in response');
+        throw new Error('Missing authorize_url');
+      }
       return url;
     } catch (error) {
-      apiLogger.error({ error, discordId }, 'Failed to create OAuth session');
+      apiLogger.error({ 
+        error, 
+        discordId, 
+        baseURL: this.api.defaults.baseURL,
+        errorDetails: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n')
+        } : error
+      }, 'Failed to create OAuth session');
+      
+      // Throw with more specific error information
+      if (error instanceof Error) {
+        throw new Error(`Failed to initialize authentication: ${error.message}`);
+      }
       throw new Error('Failed to initialize authentication');
     }
   }
