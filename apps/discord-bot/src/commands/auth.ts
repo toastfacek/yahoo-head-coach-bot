@@ -129,7 +129,9 @@ async function handleLogin(
     
     const embed = new EmbedBuilder()
       .setTitle('Connect Yahoo Fantasy Football')
-      .setDescription('Authorize the bot to access your Yahoo Fantasy data. You can revoke access at any time in Yahoo settings.')
+      .setDescription(`Authorize the bot to access your Yahoo Fantasy data. You can revoke access at any time in Yahoo settings.
+      
+⏰ **Important:** Click the link immediately and complete the process within 1-2 minutes to avoid authorization expiration.`)
       .setColor(0x430297);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

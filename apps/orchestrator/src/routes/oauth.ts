@@ -154,9 +154,14 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     }
 
     // Exchange authorization code for access token
-    console.log('[oauth-callback] Exchanging code for tokens...');
+    const exchangeStartTime = Date.now();
+    console.log('[oauth-callback] Exchanging code for tokens...', { timestamp: new Date().toISOString() });
     const tokenResponse = await exchangeCodeForTokens(code as string);
-    console.log('[oauth-callback] Token exchange successful');
+    const exchangeEndTime = Date.now();
+    console.log('[oauth-callback] Token exchange successful', { 
+      duration: exchangeEndTime - exchangeStartTime, 
+      timestamp: new Date().toISOString() 
+    });
 
     // Create or find user (must be present from state/JWT)
     const userId = ensuredUserId as string;
@@ -244,11 +249,40 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
     `);
   } catch (error) {
     console.error('OAuth callback error:', error);
-    res.status(500).send(`
-      <h2>❌ OAuth Processing Failed</h2>
-      <p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
-      <p>Please try authenticating again.</p>
-    `);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Provide specific guidance for authorization code expiration
+    if (errorMessage.includes('expired')) {
+      res.status(400).send(`
+        <h2>⏰ Authorization Expired</h2>
+        <p><strong>The authorization code expired before it could be processed.</strong></p>
+        <p>This happens when there's too much delay between clicking the auth link and completing the Yahoo OAuth flow.</p>
+        <h3>To fix this:</h3>
+        <ol>
+          <li>Go back to Discord and run <code>/auth login</code> again</li>
+          <li>Click the authentication link <strong>immediately</strong></li>
+          <li>Complete the Yahoo login process quickly</li>
+          <li>Don't switch between tabs or apps during the process</li>
+        </ol>
+        <p><strong>Tip:</strong> The entire process should take less than 1-2 minutes.</p>
+        <script>
+          setTimeout(() => {
+            window.close();
+          }, 10000);
+        </script>
+      `);
+    } else {
+      res.status(500).send(`
+        <h2>❌ OAuth Processing Failed</h2>
+        <p>Error: ${errorMessage}</p>
+        <p>Please try authenticating again.</p>
+        <script>
+          setTimeout(() => {
+            window.close();
+          }, 5000);
+        </script>
+      `);
+    }
   }
 }
 
@@ -359,9 +393,18 @@ async function exchangeCodeForTokens(code: string) {
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error('Yahoo token exchange error:', error.response?.data);
-      throw new Error(
-        `Token exchange failed: ${error.response?.data?.error_description || error.message}`
-      );
+      const errorDescription = error.response?.data?.error_description || error.message;
+      
+      // Handle specific error types
+      if (error.response?.data?.error === 'invalid_grant') {
+        if (errorDescription.includes('expired')) {
+          throw new Error('Authorization code expired. Please try authenticating again immediately after clicking the link.');
+        } else {
+          throw new Error('Authorization code is invalid. Please try authenticating again.');
+        }
+      }
+      
+      throw new Error(`Token exchange failed: ${errorDescription}`);
     }
     throw error;
   }

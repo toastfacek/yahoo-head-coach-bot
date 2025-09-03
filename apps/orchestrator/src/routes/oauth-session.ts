@@ -18,7 +18,7 @@ export async function createOAuthSession(req: Request, res: Response): Promise<v
   const kid = process.env.JWT_KID || env.JWT_KID || undefined;
 
   const iat = Math.floor(Date.now() / 1000);
-  const exp = iat + 5 * 60; // 5 minutes
+  const exp = iat + 3 * 60; // 3 minutes - reduced from 5 to minimize auth code expiration
   const jti = randomId();
 
   const token = signJWT({ sub: discordId, purpose: 'yahoo_oauth', iat, exp, jti }, secret, kid);
@@ -32,6 +32,12 @@ export async function createOAuthSession(req: Request, res: Response): Promise<v
   const base = `${proto}://${host}`;
   const authorize_url = `${base}/api/oauth/start?state=${encodeURIComponent(token)}`;
 
-  console.log('[oauth-session] created', { jti, sub: discordId, exp });
+  console.log('[oauth-session] created', { 
+    jti, 
+    sub: discordId, 
+    exp, 
+    expiresInMinutes: (exp - iat) / 60,
+    timestamp: new Date().toISOString()
+  });
   res.json({ authorize_url });
 }
