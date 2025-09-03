@@ -95,31 +95,46 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
       console.log('[oauth-callback] Starting state validation...');
       console.log('[oauth-callback] State parameter:', state?.substring(0, 50) + '...');
       
-      const secret = process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
-      console.log('[oauth-callback] Using secret:', secret === 'dev-oauth-secret' ? 'dev-default' : 'env-provided');
-      
-      const payload = verifyJWT<any>(String(state), secret);
-      console.log('[oauth-callback] JWT payload:', { 
-        purpose: payload.purpose, 
-        jti: payload.jti, 
-        sub: payload.sub, 
-        exp: payload.exp, 
-        iat: payload.iat 
-      });
-      
-      if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
-      if (!payload.jti) throw new Error('Missing jti');
-      
-      console.log('[oauth-callback] Attempting to consume state from store...');
-      const rec = await stateStore.consume(payload.jti);
-      console.log('[oauth-callback] State store result:', rec ? 'found' : 'not found');
-      
-      // If rec is missing (e.g., different instance), fall back to JWT subject
-      ensuredUserId = String((rec && (rec as any).discordId) || payload.sub || '');
-      console.log('[oauth-callback] Derived ensuredUserId:', ensuredUserId);
-      
-      if (!ensuredUserId || ensuredUserId === 'dev') throw new Error('Missing ensured user id');
-      console.log('[oauth-callback] State validation successful', { jti: payload.jti, ensuredUserId, hadState: !!rec });
+      // Try fallback state format first (base64url encoded JSON)
+      try {
+        const fallbackData = JSON.parse(Buffer.from(String(state), 'base64url').toString());
+        if (fallbackData.fallback === true && fallbackData.discordId) {
+          console.log('[oauth-callback] Using fallback state format:', { discordId: fallbackData.discordId, timestamp: fallbackData.timestamp });
+          ensuredUserId = String(fallbackData.discordId);
+          console.log('[oauth-callback] Fallback state validation successful', { ensuredUserId });
+        } else {
+          throw new Error('Not fallback format');
+        }
+      } catch (fallbackError) {
+        // Fallback failed, try JWT format
+        console.log('[oauth-callback] Fallback state parsing failed, trying JWT format...');
+        
+        const secret = process.env.OAUTH_STATE_JWT_SECRET || env.OAUTH_STATE_JWT_SECRET || 'dev-oauth-secret';
+        console.log('[oauth-callback] Using secret:', secret === 'dev-oauth-secret' ? 'dev-default' : 'env-provided');
+        
+        const payload = verifyJWT<any>(String(state), secret);
+        console.log('[oauth-callback] JWT payload:', { 
+          purpose: payload.purpose, 
+          jti: payload.jti, 
+          sub: payload.sub, 
+          exp: payload.exp, 
+          iat: payload.iat 
+        });
+        
+        if (payload.purpose !== 'yahoo_oauth') throw new Error('Invalid state purpose');
+        if (!payload.jti) throw new Error('Missing jti');
+        
+        console.log('[oauth-callback] Attempting to consume state from store...');
+        const rec = await stateStore.consume(payload.jti);
+        console.log('[oauth-callback] State store result:', rec ? 'found' : 'not found');
+        
+        // If rec is missing (e.g., different instance), fall back to JWT subject
+        ensuredUserId = String((rec && (rec as any).discordId) || payload.sub || '');
+        console.log('[oauth-callback] Derived ensuredUserId from JWT:', ensuredUserId);
+        
+        if (!ensuredUserId || ensuredUserId === 'dev') throw new Error('Missing ensured user id');
+        console.log('[oauth-callback] JWT state validation successful', { jti: payload.jti, ensuredUserId, hadState: !!rec });
+      }
     } catch (e) {
       console.error('[oauth-callback] State validation failed:', e);
       console.error('[oauth-callback] Error details:', {

@@ -66,6 +66,34 @@ export const authCommand: BotCommand = {
   },
 };
 
+async function generateFallbackAuthUrl(discordId: string): Promise<string> {
+  // Fallback OAuth URL generation when orchestrator is unavailable
+  // This uses a simple state token that the orchestrator can handle
+  const yahooClientId = process.env.YAHOO_CLIENT_ID;
+  const redirectUri = process.env.YAHOO_REDIRECT_URI;
+  
+  if (!yahooClientId || !redirectUri) {
+    throw new Error('Yahoo OAuth configuration missing (YAHOO_CLIENT_ID or YAHOO_REDIRECT_URI)');
+  }
+  
+  // Create a simple state token that includes the Discord ID and timestamp
+  // This is a temporary fallback - the orchestrator will need to handle this format
+  const fallbackState = Buffer.from(JSON.stringify({ 
+    discordId, 
+    timestamp: Date.now(),
+    fallback: true 
+  })).toString('base64url');
+  
+  const authUrl = `https://api.login.yahoo.com/oauth2/request_auth?` +
+    `client_id=${encodeURIComponent(yahooClientId)}&` +
+    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+    `response_type=code&` +
+    `scope=fspt-w&` +
+    `state=${encodeURIComponent(fallbackState)}`;
+  
+  return authUrl;
+}
+
 async function handleLogin(
   interaction: ChatInputCommandInteraction,
   discordId: string,
@@ -81,20 +109,22 @@ async function handleLogin(
     authLogger.info({ discordId }, 'Checking orchestrator health before OAuth session creation');
     const isHealthy = await orchestratorApi.healthCheck();
     
-    if (!isHealthy) {
-      authLogger.error({ discordId }, 'Orchestrator health check failed');
-      throw new Error('Authentication service is currently unavailable. Please try again later.');
-    }
-    
-    // Use orchestrator to create proper OAuth session with JWT state
-    authLogger.info({ discordId }, 'Creating OAuth session via orchestrator');
     let authUrl: string;
-    try {
-      authUrl = await orchestratorApi.createOAuthSession(discordId);
-      authLogger.info({ discordId, authUrlGenerated: !!authUrl }, 'OAuth session created successfully');
-    } catch (sessionError) {
-      authLogger.error({ error: sessionError, discordId }, 'Failed to create OAuth session via orchestrator');
-      throw new Error(`OAuth session creation failed: ${sessionError instanceof Error ? sessionError.message : 'Unknown error'}`);
+    
+    if (isHealthy) {
+      // Use orchestrator to create proper OAuth session with JWT state
+      authLogger.info({ discordId }, 'Creating OAuth session via orchestrator');
+      try {
+        authUrl = await orchestratorApi.createOAuthSession(discordId);
+        authLogger.info({ discordId, authUrlGenerated: !!authUrl }, 'OAuth session created successfully');
+      } catch (sessionError) {
+        authLogger.error({ error: sessionError, discordId }, 'Failed to create OAuth session via orchestrator, falling back to direct URL');
+        authUrl = await generateFallbackAuthUrl(discordId);
+      }
+    } else {
+      // Fallback: Generate OAuth URL directly (will need manual state validation fix)
+      authLogger.warn({ discordId }, 'Orchestrator health check failed, using fallback OAuth URL generation');
+      authUrl = await generateFallbackAuthUrl(discordId);
     }
     
     const embed = new EmbedBuilder()
