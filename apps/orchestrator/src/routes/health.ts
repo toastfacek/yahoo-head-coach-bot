@@ -7,7 +7,7 @@ export async function healthCheck(req: Request, res: Response) {
   try {
     // Check database connectivity
     const dbHealth = await getDatabaseHealth();
-    
+
     const healthStatus = {
       status: dbHealth.healthy ? 'ok' : 'degraded',
       service: 'orchestrator',
@@ -26,7 +26,7 @@ export async function healthCheck(req: Request, res: Response) {
     // Return 200 if service is operational (even if database is degraded)
     // Return 503 only if critical services are down
     const statusCode = 200;
-    
+
     res.status(statusCode).json(healthStatus);
   } catch (error) {
     // If health check itself fails, return minimal response

@@ -164,7 +164,7 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
       }
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-      
+
       console.error('[oauth-callback] State validation failed:', e);
       console.error('[oauth-callback] Error details:', {
         message: errorMessage,
@@ -173,7 +173,7 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
         hasState: !!state,
         stateLength: state?.length || 0,
       });
-      
+
       // Provide specific guidance based on error type
       let userMessage = '';
       if (errorMessage.includes('expired') || errorMessage.includes('timeout')) {
@@ -374,36 +374,36 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
       return;
     }
     const rawUserId = String(parsed.data.userId);
-    
+
     console.log('[tokenStatus] Checking auth status for rawUserId:', rawUserId);
-    
+
     // Allow passing a Discord ID; map to internal userId if a DiscordUser exists
     const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
     const userId = map?.userId || rawUserId;
-    
-    console.log('[tokenStatus] Discord ID mapping result:', { 
-      rawUserId, 
-      foundDiscordUser: !!map, 
+
+    console.log('[tokenStatus] Discord ID mapping result:', {
+      rawUserId,
+      foundDiscordUser: !!map,
       mappedUserId: map?.userId,
-      finalUserId: userId 
+      finalUserId: userId,
     });
-    
+
     const tok = await prisma.yahooToken.findUnique({ where: { userId } });
-    
+
     console.log('[tokenStatus] Yahoo token lookup result:', {
       userId,
       foundToken: !!tok,
       expiresAt: tok?.expiresAt?.toISOString(),
-      scope: tok?.scope
+      scope: tok?.scope,
     });
-    
+
     if (!tok) {
       console.log('[tokenStatus] No token found, returning not authenticated');
       res.json({ authenticated: false, userId });
       return;
     }
     const msLeft = tok.expiresAt.getTime() - Date.now();
-    
+
     console.log('[tokenStatus] Token found and valid, returning authenticated');
     res.json({
       authenticated: true,
