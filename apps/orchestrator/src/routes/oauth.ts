@@ -163,16 +163,64 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
         });
       }
     } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+      
       console.error('[oauth-callback] State validation failed:', e);
       console.error('[oauth-callback] Error details:', {
-        message: e instanceof Error ? e.message : 'Unknown error',
+        message: errorMessage,
         state: state?.substring(0, 100),
         timestamp: new Date().toISOString(),
+        hasState: !!state,
+        stateLength: state?.length || 0,
       });
+      
+      // Provide specific guidance based on error type
+      let userMessage = '';
+      if (errorMessage.includes('expired') || errorMessage.includes('timeout')) {
+        userMessage = `
+          <h2>⏰ Authentication Session Expired</h2>
+          <p><strong>The authentication session expired before completion.</strong></p>
+          <p>This can happen if you take too long between clicking the auth link and completing the Yahoo login.</p>
+          <h3>To fix this:</h3>
+          <ol>
+            <li>Go back to Discord and run <code>/auth login</code> again</li>
+            <li>Click the authentication link <strong>immediately</strong></li>
+            <li>Complete the Yahoo login process quickly (within 1-2 minutes)</li>
+          </ol>
+        `;
+      } else if (errorMessage.includes('Missing') || errorMessage.includes('Invalid')) {
+        userMessage = `
+          <h2>❌ Invalid Authentication Request</h2>
+          <p><strong>The authentication request is invalid or corrupted.</strong></p>
+          <p>This might be due to:</p>
+          <ul>
+            <li>An invalid or tampered authentication link</li>
+            <li>Browser issues or cookies being blocked</li>
+            <li>Network connectivity problems</li>
+          </ul>
+          <h3>To fix this:</h3>
+          <ol>
+            <li>Clear your browser cache and cookies</li>
+            <li>Go back to Discord and run <code>/auth login</code> again</li>
+            <li>Use the new authentication link</li>
+          </ol>
+        `;
+      } else {
+        userMessage = `
+          <h2>❌ Authentication Error</h2>
+          <p><strong>An unexpected error occurred during authentication.</strong></p>
+          <p>Error: ${errorMessage}</p>
+          <p>Please try authenticating again. If the problem persists, contact support.</p>
+        `;
+      }
+
       res.status(400).send(`
-        <h2>❌ Invalid Authorization Request</h2>
-        <p>Invalid or expired state parameter</p>
-        <p>Please try authenticating again.</p>
+        ${userMessage}
+        <script>
+          setTimeout(() => {
+            window.close();
+          }, 8000);
+        </script>
       `);
       return;
     }
