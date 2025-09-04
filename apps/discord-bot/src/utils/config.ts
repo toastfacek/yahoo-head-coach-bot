@@ -20,6 +20,13 @@ const parsed = envSchema.safeParse({
 
 export const env = parsed.success ? parsed.data : { ORCHESTRATOR_URL: 'http://localhost:3000', NODE_ENV: 'production' } as any;
 
+// Log configuration warnings
+if (!process.env.ORCHESTRATOR_URL) {
+  console.warn('⚠️  ORCHESTRATOR_URL not set, using default:', env.ORCHESTRATOR_URL);
+} else {
+  console.log('✅ ORCHESTRATOR_URL configured:', env.ORCHESTRATOR_URL);
+}
+
 export const discordConfig = {
   intents: [
     'Guilds',
