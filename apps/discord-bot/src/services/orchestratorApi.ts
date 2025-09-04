@@ -39,22 +39,49 @@ export class OrchestratorApiService {
     );
   }
 
-  async healthCheck(): Promise<boolean> {
+  async healthCheck(): Promise<{ healthy: boolean; details?: any }> {
     try {
       const healthUrl = `${this.api.defaults.baseURL}/health`;
       apiLogger.info({ healthUrl }, 'Attempting health check');
+      
       const response = await this.api.get('/health');
-      apiLogger.info({ status: response.status, healthUrl }, 'Health check successful');
-      return response.status === 200;
+      const healthData = response.data;
+      
+      apiLogger.info({ 
+        status: response.status, 
+        healthUrl,
+        orchestratorStatus: healthData.status,
+        databaseConnected: healthData.database?.connected,
+        databaseLatency: healthData.database?.latency,
+      }, 'Health check successful');
+      
+      return {
+        healthy: response.status === 200,
+        details: healthData
+      };
     } catch (error) {
       const healthUrl = `${this.api.defaults.baseURL}/health`;
-      apiLogger.error({ 
-        error: error instanceof Error ? error.message : error, 
-        healthUrl,
-        baseURL: this.api.defaults.baseURL,
-        timeout: this.api.defaults.timeout 
-      }, 'Health check failed');
-      return false;
+      
+      if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
+        apiLogger.error({ 
+          healthUrl,
+          baseURL: this.api.defaults.baseURL,
+        }, 'Health check failed: Orchestrator service is not running or unreachable');
+      } else if (error instanceof Error && error.message.includes('timeout')) {
+        apiLogger.error({ 
+          healthUrl,
+          timeout: this.api.defaults.timeout 
+        }, 'Health check failed: Request timeout - orchestrator may be overloaded');
+      } else {
+        apiLogger.error({ 
+          error: error instanceof Error ? error.message : error, 
+          healthUrl,
+          baseURL: this.api.defaults.baseURL,
+          timeout: this.api.defaults.timeout 
+        }, 'Health check failed with unexpected error');
+      }
+      
+      return { healthy: false };
     }
   }
 

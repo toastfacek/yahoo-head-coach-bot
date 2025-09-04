@@ -107,11 +107,12 @@ async function handleLogin(
 
     // Check orchestrator health first
     authLogger.info({ discordId }, 'Checking orchestrator health before OAuth session creation');
-    const isHealthy = await orchestratorApi.healthCheck();
+    const healthResult = await orchestratorApi.healthCheck();
     
     let authUrl: string;
+    let showFallbackWarning = false;
     
-    if (isHealthy) {
+    if (healthResult.healthy) {
       // Use orchestrator to create proper OAuth session with JWT state
       authLogger.info({ discordId }, 'Creating OAuth session via orchestrator');
       try {
@@ -120,11 +121,18 @@ async function handleLogin(
       } catch (sessionError) {
         authLogger.error({ error: sessionError, discordId }, 'Failed to create OAuth session via orchestrator, falling back to direct URL');
         authUrl = await generateFallbackAuthUrl(discordId);
+        showFallbackWarning = true;
       }
     } else {
       // Fallback: Generate OAuth URL directly (will need manual state validation fix)
-      authLogger.warn({ discordId }, 'Orchestrator health check failed, using fallback OAuth URL generation');
+      authLogger.warn({ 
+        discordId, 
+        healthDetails: healthResult.details?.status || 'unknown',
+        databaseConnected: healthResult.details?.database?.connected || false,
+      }, 'Orchestrator health check failed, using fallback OAuth URL generation');
+      
       authUrl = await generateFallbackAuthUrl(discordId);
+      showFallbackWarning = true;
     }
     
     const embed = new EmbedBuilder()
@@ -133,6 +141,14 @@ async function handleLogin(
       
 ⏰ **Important:** Click the link immediately and complete the process within 1-2 minutes to avoid authorization expiration.`)
       .setColor(0x430297);
+
+    if (showFallbackWarning) {
+      embed.addFields({
+        name: '⚠️ Notice',
+        value: 'Using backup authentication method due to service connectivity issues. If authentication fails, please try again in a few minutes.',
+        inline: false
+      });
+    }
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setLabel('Authorize with Yahoo').setStyle(ButtonStyle.Link).setURL(authUrl),

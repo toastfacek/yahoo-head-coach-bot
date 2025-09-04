@@ -18,6 +18,8 @@
     "deploy-commands": "npm run deploy-commands --workspace=apps/discord-bot"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.4.0",
+    "@commitlint/config-conventional": "^19.2.2",
     "dotenv": "^17.2.1",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
