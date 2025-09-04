@@ -97,22 +97,28 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 
 ## Testing the Fixes
 
-### 1. Environment Validation
+### Quick Check (Essential Only)
+For fast validation of core functionality:
+```bash
+./scripts/quick-check.sh
+```
+
+### Full Environment Validation (Recommended)
 ```bash
 ./scripts/setup-env.sh
 ```
 
-### 2. Integration Testing
+### Complete Integration Testing (Optional)
 ```bash
 # Start orchestrator
 cd apps/orchestrator
 npm run dev
 
-# In another terminal, test OAuth flow
+# In another terminal, test all functionality
 ./scripts/test-oauth-flow.sh
 ```
 
-### 3. End-to-End Testing
+### End-to-End Testing
 ```bash
 # Start Discord bot
 cd apps/discord-bot  
@@ -121,6 +127,26 @@ npm run dev
 # Test in Discord
 /auth login
 ```
+
+## What's Essential vs Optional
+
+### 🚨 ESSENTIAL (Must Work)
+1. **Orchestrator Running** - The orchestrator service must be accessible
+2. **OAuth Session Creation** - Must be able to create OAuth sessions
+3. **ORCHESTRATOR_URL Set** - Discord bot must know where to find orchestrator
+
+### 📋 OPTIONAL (Nice to Have)
+1. **Database Connection** - Will fall back to in-memory store if missing
+2. **Full Yahoo Config** - Basic OAuth flow works without complete Yahoo setup
+3. **All Environment Variables** - Some features may be limited but core functionality works
+
+### ⚡ Quick Start
+If you just want to test that the fixes work:
+
+1. Set `ORCHESTRATOR_URL` environment variable
+2. Start orchestrator: `cd apps/orchestrator && npm run dev`
+3. Run quick check: `./scripts/quick-check.sh`
+4. If it passes, you're ready to test Discord bot functionality
 
 ## Error Handling Improvements
 
