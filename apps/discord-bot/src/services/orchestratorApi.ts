@@ -41,10 +41,19 @@ export class OrchestratorApiService {
 
   async healthCheck(): Promise<boolean> {
     try {
+      const healthUrl = `${this.api.defaults.baseURL}/health`;
+      apiLogger.info({ healthUrl }, 'Attempting health check');
       const response = await this.api.get('/health');
+      apiLogger.info({ status: response.status, healthUrl }, 'Health check successful');
       return response.status === 200;
     } catch (error) {
-      apiLogger.error(error, 'Health check failed');
+      const healthUrl = `${this.api.defaults.baseURL}/health`;
+      apiLogger.error({ 
+        error: error instanceof Error ? error.message : error, 
+        healthUrl,
+        baseURL: this.api.defaults.baseURL,
+        timeout: this.api.defaults.timeout 
+      }, 'Health check failed');
       return false;
     }
   }
@@ -93,10 +102,24 @@ export class OrchestratorApiService {
 
   async checkOAuthStatus(userId: string): Promise<{ authenticated: boolean; userInfo?: any }> {
     try {
+      const statusUrl = `${this.api.defaults.baseURL}/oauth/status?userId=${userId}`;
+      apiLogger.info({ statusUrl, userId }, 'Checking OAuth status');
       const response = await this.api.get(`/oauth/status?userId=${userId}`);
+      apiLogger.info({ 
+        statusUrl, 
+        userId, 
+        status: response.status, 
+        authenticated: response.data?.authenticated 
+      }, 'OAuth status check result');
       return response.data;
     } catch (error) {
-      apiLogger.error({ error, userId }, 'Failed to check OAuth status');
+      const statusUrl = `${this.api.defaults.baseURL}/oauth/status?userId=${userId}`;
+      apiLogger.error({ 
+        error: error instanceof Error ? error.message : error, 
+        userId, 
+        statusUrl,
+        baseURL: this.api.defaults.baseURL 
+      }, 'Failed to check OAuth status');
       return { authenticated: false };
     }
   }
