@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 
-import { listUserLeagues } from '../services/yahoo';
 import { prisma } from '../db';
+import { listUserLeagues } from '../services/yahoo';
 
 const Query = z.object({ userId: z.string().min(1) });
 

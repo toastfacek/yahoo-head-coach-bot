@@ -3,8 +3,8 @@ console.log('🔄 Starting lean orchestrator server...');
 
 // Minimal imports - avoid heavy dependencies during startup
 import 'dotenv/config';
-import express from 'express';
 import cors from 'cors';
+import express from 'express';
 import helmet from 'helmet';
 
 const app = express();

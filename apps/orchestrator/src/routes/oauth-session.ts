@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { env } from '../config/env';
-import { randomId, signJWT } from '../utils/jwt';
 import { stateStore } from '../services/stateStore';
+import { randomId, signJWT } from '../utils/jwt';
 
 export async function createOAuthSession(req: Request, res: Response): Promise<void> {
   const Body = z.object({ discordId: z.string().min(5) });
