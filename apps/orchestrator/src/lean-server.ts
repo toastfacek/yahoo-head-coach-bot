@@ -20,8 +20,8 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '1mb' })); // Reduced from 10mb
 app.use(express.urlencoded({ extended: true }));
 
-// Immediate health endpoint - no dependencies
-app.get('/api/health', (req, res) => {
+// Health endpoint function for reuse
+const healthHandler = (req: express.Request, res: express.Response) => {
   const memUsage = process.memoryUsage();
   res.status(200).json({
     status: 'ok',
@@ -36,7 +36,11 @@ app.get('/api/health', (req, res) => {
       rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
     },
   });
-});
+};
+
+// Health endpoints - both paths for Railway compatibility
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 // Root endpoint
 app.get('/api', (req, res) => {
@@ -45,7 +49,7 @@ app.get('/api', (req, res) => {
     version: '1.0.0-lean',
     oauthLoaded,
     endpoints: {
-      health: '/api/health',
+      health: ['/health', '/api/health'],
       oauth: {
         start: '/api/oauth/start',
         callback: '/api/oauth/callback',
@@ -130,7 +134,7 @@ async function loadOAuthRoutes() {
         error: 'Not Found',
         message: `Route ${req.originalUrl} not found`,
         availableEndpoints: {
-          health: '/api/health',
+          health: ['/health', '/api/health'],
           oauth: {
             start: '/api/oauth/start?state=JWT_TOKEN',
             callback: '/api/oauth/callback',
@@ -172,12 +176,12 @@ app.use('*', (req, res, next) => {
       error: 'Service Loading',
       message: 'OAuth routes are still loading. Please try again in a few seconds.',
     });
-  } else if (!oauthLoaded && !req.path.match(/^\/(api\/health|api\/debug\/routes|api)$/)) {
+  } else if (!oauthLoaded && !req.path.match(/^\/(health|api\/health|api\/debug\/routes|api)$/)) {
     res.status(503).json({
       error: 'Service Loading',
       message: 'Server is still initializing. Limited endpoints available.',
       availableEndpoints: {
-        health: '/api/health',
+        health: ['/health', '/api/health'],
         debug: '/api/debug/routes',
       },
     });
@@ -201,7 +205,7 @@ async function startServer() {
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Server running on port ${PORT}`);
-    console.log(`📊 Health: http://0.0.0.0:${PORT}/api/health`);
+    console.log(`📊 Health: http://0.0.0.0:${PORT}/health`);
     console.log(`🔐 OAuth: http://0.0.0.0:${PORT}/api/oauth/start`);
 
     const memUsage = process.memoryUsage();
