@@ -13,24 +13,45 @@ export class UserService {
 
   constructor() {
     try {
+      // Enhanced debugging for database connection
+      const databaseUrl = process.env.DATABASE_URL;
+      authLogger.info({
+        hasDatabaseUrl: !!databaseUrl,
+        databaseUrlLength: databaseUrl?.length || 0,
+        databaseUrlHost: databaseUrl ? new URL(databaseUrl).host : 'none'
+      }, 'Discord bot database configuration');
+
       // If DATABASE_URL is not defined for the bot, default to in-memory
-      if (!process.env.DATABASE_URL) {
-        authLogger.warn('No DATABASE_URL configured for discord-bot; using in-memory user store');
+      if (!databaseUrl) {
+        authLogger.error('❌ CRITICAL: No DATABASE_URL configured for discord-bot; using in-memory user store');
+        authLogger.error('🔧 This will cause authentication to not persist! Set DATABASE_URL to same value as orchestrator');
         this.prisma = null;
         return;
       }
 
-      this.prisma = new PrismaClient();
+      this.prisma = new PrismaClient({
+        log: ['error', 'warn'],
+      });
+      
       // Attempt a background connect; on failure, fall back to in-memory
       this.prisma
         .$connect()
-        .then(() => authLogger.info('Connected to database for user service'))
+        .then(() => {
+          authLogger.info('✅ Successfully connected to database for user service');
+          // Test the connection by attempting a simple query
+          return this.prisma!.discordUser.count();
+        })
+        .then((count) => {
+          authLogger.info({ discordUserCount: count }, '✅ Database connection verified - Discord users table accessible');
+        })
         .catch((error) => {
-          authLogger.warn({ error }, 'Database connect failed, using in-memory store');
+          authLogger.error({ error: error.message }, '❌ Database connect failed, using in-memory store');
+          authLogger.error('🔧 This will cause authentication to not persist! Check DATABASE_URL and network connectivity');
           this.prisma = null;
         });
     } catch (error) {
-      authLogger.warn(error, 'Database initialization failed, using in-memory store');
+      authLogger.error(error, '❌ Database initialization failed, using in-memory store');
+      authLogger.error('🔧 This will cause authentication to not persist!');
       this.prisma = null;
     }
   }

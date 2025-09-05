@@ -186,6 +186,27 @@ async function handleStatus(interaction: ChatInputCommandInteraction, discordId:
       await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
     }
 
+    // Check if Discord bot has database access
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      const embed = new EmbedBuilder()
+        .setTitle('⚠️ Configuration Issue')
+        .setDescription(
+          '❌ **Database Connection Missing**\n\n' +
+          'The Discord bot cannot access the database where authentication tokens are stored.\n' +
+          'This means authentication status cannot be properly checked.\n\n' +
+          '🔧 **Admin Action Required:**\n' +
+          '• Set `DATABASE_URL` environment variable for the Discord bot\n' +
+          '• Use the same database URL as the orchestrator service\n\n' +
+          '💡 **Temporary Workaround:**\n' +
+          'Authentication may still work - try using other fantasy commands to test.'
+        )
+        .setColor(0xff9900);
+
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
     // Ensure user exists in our system (happens quickly in background)
     userService.createOrUpdateUser(discordId, discordUsername).catch(error => {
       authLogger.warn({ error, discordId }, 'User creation failed but continuing with status check');
