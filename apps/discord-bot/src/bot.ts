@@ -29,10 +29,15 @@ client.commands = new Collection<string, BotCommand>();
 client.buttons = new Collection<string, BotButton>();
 
 async function initializeBot() {
-  try {
-    // Start lightweight HTTP server for platform healthchecks
-    startHealthServer();
+  // CRITICAL: Start health server first, before anything else can fail
+  console.log('🚀 Starting Discord bot initialization...');
+  const healthServer = startHealthServer();
+  
+  if (!healthServer) {
+    console.error('❌ Health server failed to start - this will cause deployment issues');
+  }
 
+  try {
     // Load commands
     const commands = loadCommands();
     client.commands = commands;
@@ -53,6 +58,7 @@ async function initializeBot() {
     // Login to Discord (if token present)
     if (!env.DISCORD_TOKEN) {
       discordLogger.warn('DISCORD_TOKEN is not set. Skipping Discord login; health endpoint will remain up.');
+      console.log('⚠️ Discord login skipped - health endpoint should still be accessible');
       return;
     }
     await client.login(env.DISCORD_TOKEN);
@@ -60,6 +66,7 @@ async function initializeBot() {
   } catch (error) {
     // Do not exit the process so health endpoint stays up
     discordLogger.error(error, 'Failed to initialize bot; keeping process alive for healthchecks');
+    console.error('❌ Bot initialization failed, but health endpoint should still work');
   }
 }
 
@@ -146,6 +153,17 @@ async function cleanup() {
     discordLogger.error(error, 'Error during cleanup');
   }
 }
+
+// Debug environment for Railway deployment
+console.log('🌍 Environment debug:', {
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: process.env.PORT,
+  DISCORD_HEALTH_PORT: process.env.DISCORD_HEALTH_PORT,
+  SERVICE: process.env.SERVICE,
+  hasDiscordToken: !!process.env.DISCORD_TOKEN,
+  hasOrchestratorUrl: !!process.env.ORCHESTRATOR_URL,
+  hasDatabaseUrl: !!process.env.DATABASE_URL
+});
 
 // Start the bot
 if (require.main === module) {
