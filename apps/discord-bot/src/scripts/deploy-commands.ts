@@ -6,6 +6,13 @@ import { discordLogger } from '../utils/logger';
 
 async function deployCommands() {
   try {
+    if (!env.DISCORD_TOKEN) {
+      throw new Error('DISCORD_TOKEN is required for command deployment');
+    }
+    if (!env.DISCORD_CLIENT_ID) {
+      throw new Error('DISCORD_CLIENT_ID is required for command deployment');
+    }
+
     const commands = loadCommands();
     const commandData = Array.from(commands.values()).map(cmd => cmd.data.toJSON());
     
