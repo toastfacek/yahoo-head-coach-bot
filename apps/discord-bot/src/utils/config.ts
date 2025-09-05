@@ -23,7 +23,7 @@ if (!parsed.success) {
   console.error('❌ Configuration validation failed:', parsed.error.format());
   if (!process.env.ORCHESTRATOR_URL) {
     console.error('🚨 ORCHESTRATOR_URL is required but not set! Please configure it in your environment.');
-    console.error('📝 For local development, set: ORCHESTRATOR_URL=http://localhost:3000');
+    console.error('📝 For local development, set: ORCHESTRATOR_URL=http://localhost:8080');
     console.error('🚀 For production, set: ORCHESTRATOR_URL=https://your-orchestrator-domain');
     process.exit(1);
   }

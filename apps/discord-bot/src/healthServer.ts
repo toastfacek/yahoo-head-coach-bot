@@ -2,7 +2,7 @@ import express from 'express';
 
 export function startHealthServer() {
   const app = express();
-  const port = Number(process.env.PORT || 3000);
+  const port = Number(process.env.DISCORD_HEALTH_PORT || 8081);
 
   app.get('/', (_req, res) => res.status(200).json({ status: 'ok', service: 'discord-bot' }));
   app.get('/health', (_req, res) => res.status(200).json({ status: 'ok', service: 'discord-bot' }));
