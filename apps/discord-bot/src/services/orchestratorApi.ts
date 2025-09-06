@@ -136,7 +136,8 @@ export class OrchestratorApiService {
         statusUrl, 
         userId, 
         status: response.status, 
-        authenticated: response.data?.authenticated 
+        authenticated: response.data?.authenticated,
+        responseData: response.data
       }, 'OAuth status check result');
       return response.data;
     } catch (error) {
@@ -145,7 +146,12 @@ export class OrchestratorApiService {
         error: error instanceof Error ? error.message : error, 
         userId, 
         statusUrl,
-        baseURL: this.api.defaults.baseURL 
+        baseURL: this.api.defaults.baseURL,
+        errorDetails: error instanceof Error && 'response' in error ? {
+          status: (error as any).response?.status,
+          statusText: (error as any).response?.statusText,
+          responseData: (error as any).response?.data
+        } : undefined
       }, 'Failed to check OAuth status');
       return { authenticated: false };
     }

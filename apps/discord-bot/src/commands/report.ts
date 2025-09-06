@@ -25,8 +25,7 @@ export const reportCommand: BotCommand = {
       const synced = await userService.ensureAuthenticated(discordId, interaction.user.username);
       isAuth = synced || (await userService.isAuthenticated(discordId));
     }
-    let yahooUserId = await userService.getYahooUserId(discordId);
-    if (!isAuth || !yahooUserId) {
+    if (!isAuth) {
       await interaction.reply({
         content: '🔐 You need to authenticate first. Use `/auth login` to connect your Yahoo account.',
         flags: MessageFlags.Ephemeral,
@@ -40,7 +39,7 @@ export const reportCommand: BotCommand = {
       // Get user's leagues if no league specified
       let targetLeagueId = leagueId;
       if (!targetLeagueId) {
-        const leagues = await orchestratorApi.getUserLeagues(yahooUserId);
+        const leagues = await orchestratorApi.getUserLeagues(discordId);
         if (leagues.length === 0) {
           await interaction.editReply({
             content: '❌ No fantasy leagues found for your account.'
@@ -65,7 +64,7 @@ export const reportCommand: BotCommand = {
       let currentSection = '';
       
       try {
-        for await (const chunk of await orchestratorApi.getDailyReport(yahooUserId, targetLeagueId!)) {
+        for await (const chunk of await orchestratorApi.getDailyReport(discordId, targetLeagueId!)) {
           reportContent += chunk;
           
           // Update the embed periodically with streaming content
@@ -148,10 +147,10 @@ export const reportCommand: BotCommand = {
         });
       }
 
-      discordLogger.info({ discordId, yahooUserId, leagueId: targetLeagueId }, 'Daily report completed');
+      discordLogger.info({ discordId, leagueId: targetLeagueId }, 'Daily report completed');
 
     } catch (error) {
-      discordLogger.error({ error, discordId, yahooUserId, leagueId }, 'Daily report failed');
+      discordLogger.error({ error, discordId, leagueId }, 'Daily report failed');
       
       await interaction.editReply({
         content: '❌ Failed to generate daily report. Please try again later.'

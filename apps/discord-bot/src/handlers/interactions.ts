@@ -147,11 +147,13 @@ async function handleAuthStatusButton(interaction: ButtonInteraction) {
     let description = '';
     let color = 0xff0000;
     if (isAuth && user?.yahooUserId) {
-      const oauthStatus = await orchestratorApi.checkOAuthStatus(user.yahooUserId);
+      // Use Discord ID for OAuth status check since orchestrator handles the mapping
+      const oauthStatus = await orchestratorApi.checkOAuthStatus(discordId);
       if (oauthStatus.authenticated) {
         description =
           '✅ Connected to Yahoo Fantasy Football\n\n' +
-          `Yahoo ID: \`${user.yahooUserId}\`\n` +
+          `Discord ID: \`${discordId}\`\n` +
+          `User ID: \`${user.yahooUserId}\`\n` +
           (oauthStatus.userInfo?.expiresAt ? `Expires: ${oauthStatus.userInfo.expiresAt}\n` : '') +
           '\nYou can now use fantasy commands.';
         color = 0x00ff00;
@@ -202,23 +204,17 @@ async function handleApproveButton(interaction: ButtonInteraction, recommendatio
     return;
   }
 
-  const yahooUserId = await userService.getYahooUserId(discordId);
-  if (!yahooUserId) {
-    await interaction.reply({ content: '❌ Authentication error. Please re-authenticate.', flags: MessageFlags.Ephemeral });
-    return;
-  }
-
   try {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const success = await orchestratorApi.approveRecommendation(yahooUserId, recommendationId);
+    const success = await orchestratorApi.approveRecommendation(discordId, recommendationId);
     
     if (success) {
       await interaction.editReply({
         content: '✅ Recommendation approved and executed!'
       });
       
-      discordLogger.info({ discordId, yahooUserId, recommendationId }, 'Recommendation approved');
+      discordLogger.info({ discordId, recommendationId }, 'Recommendation approved');
     } else {
       await interaction.editReply({
         content: '❌ Failed to approve recommendation. It may have already been processed.'
@@ -242,23 +238,17 @@ async function handleRejectButton(interaction: ButtonInteraction, recommendation
     return;
   }
 
-  const yahooUserId = await userService.getYahooUserId(discordId);
-  if (!yahooUserId) {
-    await interaction.reply({ content: '❌ Authentication error. Please re-authenticate.', flags: MessageFlags.Ephemeral });
-    return;
-  }
-
   try {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const success = await orchestratorApi.rejectRecommendation(yahooUserId, recommendationId);
+    const success = await orchestratorApi.rejectRecommendation(discordId, recommendationId);
     
     if (success) {
       await interaction.editReply({
         content: '❌ Recommendation rejected and will not be executed.'
       });
       
-      discordLogger.info({ discordId, yahooUserId, recommendationId }, 'Recommendation rejected');
+      discordLogger.info({ discordId, recommendationId }, 'Recommendation rejected');
     } else {
       await interaction.editReply({
         content: '❌ Failed to reject recommendation. It may have already been processed.'
@@ -285,24 +275,15 @@ async function handleDetailsButton(interaction: ButtonInteraction, recommendatio
     return;
   }
 
-  const yahooUserId = await userService.getYahooUserId(discordId);
-  if (!yahooUserId) {
-      await interaction.reply({
-        content: '❌ Authentication error. Please re-authenticate.',
-        flags: MessageFlags.Ephemeral,
-      });
-    return;
-  }
-
   try {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     // Get user's leagues to find the recommendation
-    const leagues = await orchestratorApi.getUserLeagues(yahooUserId);
+    const leagues = await orchestratorApi.getUserLeagues(discordId);
     let recommendationDetails = null;
     
     for (const league of leagues) {
-      const pending = await orchestratorApi.getPendingApprovals(yahooUserId, league.id);
+      const pending = await orchestratorApi.getPendingApprovals(discordId, league.id);
       recommendationDetails = pending.find(p => p.id === recommendationId);
       if (recommendationDetails) break;
     }
@@ -389,7 +370,7 @@ async function handleDetailsButton(interaction: ButtonInteraction, recommendatio
       embeds: [embed]
     });
 
-    discordLogger.info({ discordId, yahooUserId, recommendationId }, 'Displayed recommendation details');
+    discordLogger.info({ discordId, recommendationId }, 'Displayed recommendation details');
 
   } catch (error) {
     discordLogger.error({ error, discordId, recommendationId }, 'Error getting recommendation details');

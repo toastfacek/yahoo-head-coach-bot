@@ -25,8 +25,7 @@ export const approvalsCommand: BotCommand = {
       const synced = await userService.ensureAuthenticated(discordId, interaction.user.username);
       isAuth = synced || (await userService.isAuthenticated(discordId));
     }
-    let yahooUserId = await userService.getYahooUserId(discordId);
-    if (!isAuth || !yahooUserId) {
+    if (!isAuth) {
       await interaction.reply({
         content: '🔐 You need to authenticate first. Use `/auth login` to connect your Yahoo account.',
         flags: MessageFlags.Ephemeral,
@@ -40,7 +39,7 @@ export const approvalsCommand: BotCommand = {
       // Get user's leagues if no league specified
       let targetLeagueId = leagueId;
       if (!targetLeagueId) {
-        const leagues = await orchestratorApi.getUserLeagues(yahooUserId);
+        const leagues = await orchestratorApi.getUserLeagues(discordId);
         if (leagues.length === 0) {
           await interaction.editReply({
             content: '❌ No fantasy leagues found for your account.'
@@ -51,7 +50,7 @@ export const approvalsCommand: BotCommand = {
       }
 
       // Get pending approvals
-      const pendingApprovals = await orchestratorApi.getPendingApprovals(yahooUserId, targetLeagueId!);
+      const pendingApprovals = await orchestratorApi.getPendingApprovals(discordId, targetLeagueId!);
 
       if (pendingApprovals.length === 0) {
         const embed = new EmbedBuilder()
@@ -169,13 +168,12 @@ export const approvalsCommand: BotCommand = {
 
       discordLogger.info({ 
         discordId, 
-        yahooUserId, 
         leagueId: targetLeagueId, 
         pendingCount: pendingApprovals.length 
       }, 'Displayed pending approvals');
 
     } catch (error) {
-      discordLogger.error({ error, discordId, yahooUserId, leagueId }, 'Failed to get pending approvals');
+      discordLogger.error({ error, discordId, leagueId }, 'Failed to get pending approvals');
       
       await interaction.editReply({
         content: '❌ Failed to retrieve pending approvals. Please try again later.'

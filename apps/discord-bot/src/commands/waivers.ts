@@ -25,8 +25,7 @@ export const waiversCommand: BotCommand = {
       const synced = await userService.ensureAuthenticated(discordId, interaction.user.username);
       isAuth = synced || (await userService.isAuthenticated(discordId));
     }
-    let yahooUserId = await userService.getYahooUserId(discordId);
-    if (!isAuth || !yahooUserId) {
+    if (!isAuth) {
       await interaction.reply({
         content: '🔐 You need to authenticate first. Use `/auth login` to connect your Yahoo account.',
         flags: MessageFlags.Ephemeral,
@@ -40,7 +39,7 @@ export const waiversCommand: BotCommand = {
       // Get user's leagues if no league specified
       let targetLeagueId = leagueId;
       if (!targetLeagueId) {
-        const leagues = await orchestratorApi.getUserLeagues(yahooUserId);
+        const leagues = await orchestratorApi.getUserLeagues(discordId);
         if (leagues.length === 0) {
           await interaction.editReply({
             content: '❌ No fantasy leagues found for your account.'
@@ -51,7 +50,7 @@ export const waiversCommand: BotCommand = {
       }
 
       // Analyze waivers
-      const waiverData = await orchestratorApi.analyzeWaivers(yahooUserId, targetLeagueId!);
+      const waiverData = await orchestratorApi.analyzeWaivers(discordId, targetLeagueId!);
 
       // Create embed response
       const embed = new EmbedBuilder()
@@ -107,10 +106,10 @@ export const waiversCommand: BotCommand = {
         embeds: [embed]
       });
 
-      discordLogger.info({ discordId, yahooUserId, leagueId: targetLeagueId }, 'Waiver analysis completed');
+      discordLogger.info({ discordId, leagueId: targetLeagueId }, 'Waiver analysis completed');
 
     } catch (error) {
-      discordLogger.error({ error, discordId, yahooUserId, leagueId }, 'Waiver analysis failed');
+      discordLogger.error({ error, discordId, leagueId }, 'Waiver analysis failed');
       
       await interaction.editReply({
         content: '❌ Failed to analyze waiver wire. Please try again later.'

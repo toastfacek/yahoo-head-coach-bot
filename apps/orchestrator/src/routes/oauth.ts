@@ -386,6 +386,12 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
       foundDiscordUser: !!map,
       mappedUserId: map?.userId,
       finalUserId: userId,
+      discordUserData: map ? {
+        discordId: map.discordId,
+        isAuthenticated: map.isAuthenticated,
+        createdAt: map.createdAt?.toISOString(),
+        updatedAt: map.updatedAt?.toISOString()
+      } : null
     });
 
     const tok = await prisma.yahooToken.findUnique({ where: { userId } });
@@ -395,6 +401,9 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
       foundToken: !!tok,
       expiresAt: tok?.expiresAt?.toISOString(),
       scope: tok?.scope,
+      tokenType: tok?.tokenType,
+      isExpired: tok ? tok.expiresAt.getTime() < Date.now() : null,
+      currentTime: new Date().toISOString()
     });
 
     if (!tok) {
@@ -402,7 +411,27 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
       res.json({ authenticated: false, userId });
       return;
     }
+    
     const msLeft = tok.expiresAt.getTime() - Date.now();
+    const isTokenExpired = msLeft <= 0;
+
+    console.log('[tokenStatus] Token expiry check:', {
+      tokenExpiry: tok.expiresAt.toISOString(),
+      currentTime: new Date().toISOString(),
+      msLeft,
+      isTokenExpired
+    });
+
+    if (isTokenExpired) {
+      console.log('[tokenStatus] Token expired, returning not authenticated');
+      res.json({ 
+        authenticated: false, 
+        userId,
+        reason: 'token_expired',
+        expiresAt: tok.expiresAt.toISOString()
+      });
+      return;
+    }
 
     console.log('[tokenStatus] Token found and valid, returning authenticated');
     res.json({
@@ -416,8 +445,11 @@ export async function tokenStatus(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    console.error('tokenStatus error:', error);
-    res.status(500).json({ error: 'Failed to fetch token status' });
+    console.error('[tokenStatus] Error occurred:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch token status',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }
 

@@ -121,3 +121,54 @@ With the Discord OAuth flow implementation complete and validated by E2E tests, 
 5. **Feature Development**: Begin implementation of core fantasy football features (daily reports, lineup optimization, waiver analysis) using the validated OAuth foundation
 
 The Discord OAuth flow refactor is **production-ready** and provides a solid foundation for building the core fantasy football management features.
+
+### Discord Bot User ID Consistency Fix (January 2025)
+**Critical Fix**: Resolved systematic user ID inconsistency causing authentication failures in fantasy football commands.
+
+**Root Cause Identified:**
+The Discord bot was inconsistently passing different user ID types to orchestrator API endpoints:
+- ✅ OAuth endpoints (`checkOAuthStatus`, `createOAuthSession`) correctly used Discord IDs
+- ❌ Fantasy endpoints (`getUserLeagues`, `checkLineup`, `approveRecommendation`, etc.) incorrectly used internal user IDs
+
+**The Problem:**
+All orchestrator API endpoints are designed to accept Discord IDs and handle internal user mapping via:
+```typescript
+const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
+const userId = map?.userId || rawUserId;
+```
+
+But the Discord bot was calling `userService.getYahooUserId(discordId)` to get internal user IDs, then passing those to endpoints that expected Discord IDs, causing mapping failures.
+
+**Systematic Fix Applied:**
+Updated **7 files** across the Discord bot codebase to consistently pass `discordId` to all orchestrator API calls:
+
+**Files Updated:**
+- `apps/discord-bot/src/commands/lineup.ts` - Lineup analysis command
+- `apps/discord-bot/src/commands/waivers.ts` - Waiver wire analysis command  
+- `apps/discord-bot/src/commands/approvals.ts` - Pending recommendations management
+- `apps/discord-bot/src/commands/report.ts` - Daily fantasy report generation
+- `apps/discord-bot/src/handlers/interactions.ts` - Button interactions (approve/reject/details)
+- `apps/discord-bot/src/handlers/messages.ts` - Message processing and chat handlers
+- `apps/discord-bot/src/services/scheduler.ts` - Automated daily reports and notifications
+
+**Pattern Changed:**
+```typescript
+// Before (Inconsistent & Broken):
+let yahooUserId = await userService.getYahooUserId(discordId);
+if (!yahooUserId) return; // Error handling
+await orchestratorApi.getUserLeagues(yahooUserId); // Wrong ID type
+
+// After (Consistent & Working):  
+await orchestratorApi.getUserLeagues(discordId); // Correct ID type
+```
+
+**Impact:**
+- ✅ Fixed `/lineup`, `/waivers`, `/approvals`, `/report` commands
+- ✅ Fixed approve/reject/details button interactions  
+- ✅ Fixed message-based fantasy queries and chat
+- ✅ Fixed scheduled daily reports and notifications
+- ✅ Simplified authentication flow by removing unnecessary ID lookups
+- ✅ Improved debugging with enhanced OAuth status logging
+
+**Testing:**
+The OAuth callback flow was already working (tokens stored successfully), but status checks and fantasy operations were failing due to this ID mapping mismatch. This fix resolves the "Failed to check OAuth status" errors seen in production logs.

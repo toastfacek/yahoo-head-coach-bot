@@ -25,8 +25,7 @@ export const lineupCommand: BotCommand = {
       const synced = await userService.ensureAuthenticated(discordId, interaction.user.username);
       isAuth = synced || (await userService.isAuthenticated(discordId));
     }
-    let yahooUserId = await userService.getYahooUserId(discordId);
-    if (!isAuth || !yahooUserId) {
+    if (!isAuth) {
       await interaction.reply({
         content: '🔐 You need to authenticate first. Use `/auth login` to connect your Yahoo account.',
         flags: MessageFlags.Ephemeral,
@@ -40,7 +39,7 @@ export const lineupCommand: BotCommand = {
       // Get user's leagues if no league specified
       let targetLeagueId = leagueId;
       if (!targetLeagueId) {
-        const leagues = await orchestratorApi.getUserLeagues(yahooUserId);
+        const leagues = await orchestratorApi.getUserLeagues(discordId);
         if (leagues.length === 0) {
           await interaction.editReply({
             content: '❌ No fantasy leagues found for your account.'
@@ -51,7 +50,7 @@ export const lineupCommand: BotCommand = {
       }
 
       // Analyze lineup
-      const lineupData = await orchestratorApi.checkLineup(yahooUserId, targetLeagueId!);
+      const lineupData = await orchestratorApi.checkLineup(discordId, targetLeagueId!);
 
       // Create embed response
       const embed = new EmbedBuilder()
@@ -104,10 +103,10 @@ export const lineupCommand: BotCommand = {
         embeds: [embed]
       });
 
-      discordLogger.info({ discordId, yahooUserId, leagueId: targetLeagueId }, 'Lineup analysis completed');
+      discordLogger.info({ discordId, leagueId: targetLeagueId }, 'Lineup analysis completed');
 
     } catch (error) {
-      discordLogger.error({ error, discordId, yahooUserId, leagueId }, 'Lineup analysis failed');
+      discordLogger.error({ error, discordId, leagueId }, 'Lineup analysis failed');
       
       await interaction.editReply({
         content: '❌ Failed to analyze your lineup. Please try again later.'

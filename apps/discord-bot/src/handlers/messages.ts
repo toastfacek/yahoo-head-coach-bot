@@ -39,16 +39,6 @@ export async function handleMessage(client: ExtendedClient, message: Message) {
       return;
     }
 
-    const yahooUserId = await userService.getYahooUserId(discordId);
-    if (!yahooUserId) {
-      await message.reply(
-        '❌ There seems to be an authentication issue. Please try:\n' +
-        '1. `/auth logout`\n' +
-        '2. `/auth login`'
-      );
-      return;
-    }
-
     // Show typing indicator while processing
     if ('sendTyping' in message.channel) {
       await message.channel.sendTyping();
@@ -59,10 +49,10 @@ export async function handleMessage(client: ExtendedClient, message: Message) {
     
     if (intent === 'unknown') {
       // Send to orchestrator for general chat processing
-      await handleGeneralChat(message, yahooUserId, content);
+      await handleGeneralChat(message, discordId, content);
     } else {
       // Handle specific intents
-      await handleSpecificIntent(message, yahooUserId, intent, content);
+      await handleSpecificIntent(message, discordId, intent, content);
     }
 
   } catch (error) {
@@ -109,12 +99,12 @@ function classifyUserIntent(content: string): string {
   return 'unknown';
 }
 
-async function handleSpecificIntent(message: Message, yahooUserId: string, intent: string, content: string) {
+async function handleSpecificIntent(message: Message, discordId: string, intent: string, content: string) {
   let response = '';
   
   try {
     // Get user's primary league
-    const leagues = await orchestratorApi.getUserLeagues(yahooUserId);
+    const leagues = await orchestratorApi.getUserLeagues(discordId);
     const leagueId = leagues.length > 0 ? leagues[0].id : null;
     
     if (!leagueId) {
@@ -127,7 +117,7 @@ async function handleSpecificIntent(message: Message, yahooUserId: string, inten
         response = '📊 Let me analyze your lineup...';
         await message.reply(response);
         
-        const lineupData = await orchestratorApi.checkLineup(yahooUserId, leagueId);
+        const lineupData = await orchestratorApi.checkLineup(discordId, leagueId);
         await sendLineupResponse(message, lineupData);
         break;
         
@@ -135,7 +125,7 @@ async function handleSpecificIntent(message: Message, yahooUserId: string, inten
         response = '🔍 Checking the waiver wire for opportunities...';
         await message.reply(response);
         
-        const waiverData = await orchestratorApi.analyzeWaivers(yahooUserId, leagueId);
+        const waiverData = await orchestratorApi.analyzeWaivers(discordId, leagueId);
         await sendWaiverResponse(message, waiverData);
         break;
         
@@ -143,7 +133,7 @@ async function handleSpecificIntent(message: Message, yahooUserId: string, inten
         response = '📈 Generating your daily fantasy report...';
         const reportMessage = await message.reply(response);
         
-        await streamReportResponse(reportMessage, yahooUserId, leagueId);
+        await streamReportResponse(reportMessage, discordId, leagueId);
         break;
         
       case 'team_info':
@@ -160,17 +150,17 @@ async function handleSpecificIntent(message: Message, yahooUserId: string, inten
     }
     
   } catch (error) {
-    discordLogger.error({ error, intent, yahooUserId }, 'Error handling specific intent');
+    discordLogger.error({ error, intent, discordId }, 'Error handling specific intent');
     await message.reply('❌ Sorry, I encountered an error processing your request.');
   }
 }
 
-async function handleGeneralChat(message: Message, yahooUserId: string, content: string) {
+async function handleGeneralChat(message: Message, discordId: string, content: string) {
   try {
     // Stream response from orchestrator chat endpoint
     let chatResponse = '';
     
-    for await (const chunk of await orchestratorApi.sendChatMessage(yahooUserId, content)) {
+    for await (const chunk of await orchestratorApi.sendChatMessage(discordId, content)) {
       chatResponse += chunk;
     }
     
@@ -192,7 +182,7 @@ async function handleGeneralChat(message: Message, yahooUserId: string, content:
     }
     
   } catch (error) {
-    discordLogger.error({ error, yahooUserId, content }, 'Error in general chat');
+    discordLogger.error({ error, discordId, content }, 'Error in general chat');
     await message.reply(
       '❌ Sorry, I\'m having trouble understanding your request right now. Try using a slash command instead!'
     );
@@ -251,11 +241,11 @@ async function sendWaiverResponse(message: Message, waiverData: any) {
   await message.reply({ embeds: [embed] });
 }
 
-async function streamReportResponse(message: Message, yahooUserId: string, leagueId: string) {
+async function streamReportResponse(message: Message, discordId: string, leagueId: string) {
   let reportContent = '';
   
   try {
-    for await (const chunk of await orchestratorApi.getDailyReport(yahooUserId, leagueId)) {
+    for await (const chunk of await orchestratorApi.getDailyReport(discordId, leagueId)) {
       reportContent += chunk;
       
       // Update message periodically (rate limit friendly)
@@ -280,7 +270,7 @@ async function streamReportResponse(message: Message, yahooUserId: string, leagu
     await message.edit('📈 **Daily Fantasy Report**\n\n' + finalContent);
     
   } catch (error) {
-    discordLogger.error({ error, yahooUserId, leagueId }, 'Error streaming report');
+    discordLogger.error({ error, discordId, leagueId }, 'Error streaming report');
     await message.edit('❌ Error generating report. Please try the `/report` command.');
   }
 }

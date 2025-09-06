@@ -90,12 +90,11 @@ export class SchedulerService {
 
       for (const user of activeUsers) {
         try {
-          await this.sendDailyReportToUser(user.discordId, user.yahooUserId!);
+          await this.sendDailyReportToUser(user.discordId);
         } catch (error) {
           discordLogger.error({ 
             error, 
-            discordId: user.discordId, 
-            yahooUserId: user.yahooUserId 
+            discordId: user.discordId
           }, 'Failed to send daily report to user');
         }
       }
@@ -109,10 +108,10 @@ export class SchedulerService {
   /**
    * Send daily report to a specific user
    */
-  private async sendDailyReportToUser(discordId: string, yahooUserId: string) {
+  private async sendDailyReportToUser(discordId: string) {
     try {
       // Get user's leagues
-      const leagues = await orchestratorApi.getUserLeagues(yahooUserId);
+      const leagues = await orchestratorApi.getUserLeagues(discordId);
       if (leagues.length === 0) {
         return;
       }
@@ -141,7 +140,7 @@ export class SchedulerService {
       // Stream the report content
       let reportContent = '';
       try {
-        for await (const chunk of await orchestratorApi.getDailyReport(yahooUserId, primaryLeague.id)) {
+        for await (const chunk of await orchestratorApi.getDailyReport(discordId, primaryLeague.id)) {
           reportContent += chunk;
         }
 
@@ -169,7 +168,7 @@ export class SchedulerService {
           embeds: [finalEmbed]
         });
 
-        discordLogger.info({ discordId, yahooUserId, leagueId: primaryLeague.id }, 'Daily report sent');
+        discordLogger.info({ discordId, leagueId: primaryLeague.id }, 'Daily report sent');
 
       } catch (streamError) {
         discordLogger.error({ streamError, discordId }, 'Error streaming daily report');
@@ -185,7 +184,7 @@ export class SchedulerService {
       }
 
     } catch (error) {
-      discordLogger.error({ error, discordId, yahooUserId }, 'Failed to send daily report to user');
+      discordLogger.error({ error, discordId }, 'Failed to send daily report to user');
     }
   }
 
@@ -201,12 +200,11 @@ export class SchedulerService {
 
       for (const user of activeUsers) {
         try {
-          await this.sendWaiverReminderToUser(user.discordId, user.yahooUserId!);
+          await this.sendWaiverReminderToUser(user.discordId);
         } catch (error) {
           discordLogger.error({ 
             error, 
-            discordId: user.discordId, 
-            yahooUserId: user.yahooUserId 
+            discordId: user.discordId
           }, 'Failed to send waiver reminder to user');
         }
       }
@@ -220,7 +218,7 @@ export class SchedulerService {
   /**
    * Send waiver reminder to a specific user
    */
-  private async sendWaiverReminderToUser(discordId: string, yahooUserId: string) {
+  private async sendWaiverReminderToUser(discordId: string) {
     try {
       const user = await this.client.users.fetch(discordId);
       if (!user) return;
@@ -242,10 +240,10 @@ export class SchedulerService {
         embeds: [embed]
       });
 
-      discordLogger.info({ discordId, yahooUserId }, 'Waiver reminder sent');
+      discordLogger.info({ discordId }, 'Waiver reminder sent');
 
     } catch (error) {
-      discordLogger.error({ error, discordId, yahooUserId }, 'Failed to send waiver reminder');
+      discordLogger.error({ error, discordId }, 'Failed to send waiver reminder');
     }
   }
 
@@ -261,12 +259,11 @@ export class SchedulerService {
 
       for (const user of activeUsers) {
         try {
-          await this.checkInjuryAlertsForUser(user.discordId, user.yahooUserId!);
+          await this.checkInjuryAlertsForUser(user.discordId);
         } catch (error) {
           discordLogger.error({ 
             error, 
-            discordId: user.discordId, 
-            yahooUserId: user.yahooUserId 
+            discordId: user.discordId
           }, 'Failed to check injury alerts for user');
         }
       }
@@ -280,12 +277,12 @@ export class SchedulerService {
   /**
    * Check injury alerts for a specific user
    */
-  private async checkInjuryAlertsForUser(discordId: string, yahooUserId: string) {
+  private async checkInjuryAlertsForUser(discordId: string) {
     try {
       // This would integrate with the orchestrator's injury monitoring
       // For now, we'll implement a basic check
       
-      const leagues = await orchestratorApi.getUserLeagues(yahooUserId);
+      const leagues = await orchestratorApi.getUserLeagues(discordId);
       if (leagues.length === 0) return;
 
       // Check for critical injury updates that would trigger alerts
@@ -293,10 +290,10 @@ export class SchedulerService {
       // and alerting on status changes that significantly impact fantasy value
 
       // Placeholder for injury alert logic
-      discordLogger.debug({ discordId, yahooUserId }, 'Injury alert check completed (no alerts)');
+      discordLogger.debug({ discordId }, 'Injury alert check completed (no alerts)');
 
     } catch (error) {
-      discordLogger.error({ error, discordId, yahooUserId }, 'Failed to check injury alerts');
+      discordLogger.error({ error, discordId }, 'Failed to check injury alerts');
     }
   }
 
