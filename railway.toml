@@ -1,9 +1,11 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npx prisma generate --schema=packages/data/prisma/schema.prisma"
+# Install dev deps to allow TypeScript build, then build the Discord bot
+buildCommand = "npm install --include=dev && npx prisma generate --schema=packages/data/prisma/schema.prisma && npm run -w @yahoo-fantasy-bot/discord-bot build"
 
 [deploy]
-startCommand = "sh -c 'npx ts-node apps/discord-bot/src/bot.ts'"
+# Run compiled JS instead of ts-node (ts-node isn't installed in production)
+startCommand = "node apps/discord-bot/dist/bot.js"
 healthcheckPath = "/health"
 restartPolicyType = "always"
 
