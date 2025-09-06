@@ -1,8 +1,9 @@
-import { Client, SlashCommandBuilder, ChatInputCommandInteraction, ButtonInteraction } from 'discord.js';
+import { Client, SlashCommandBuilder, ChatInputCommandInteraction, ButtonInteraction, AutocompleteInteraction } from 'discord.js';
 
 export interface BotCommand {
   data: SlashCommandBuilder;
   execute(interaction: ChatInputCommandInteraction): Promise<void>;
+  autocomplete?(interaction: AutocompleteInteraction): Promise<void>;
 }
 
 export interface BotButton {

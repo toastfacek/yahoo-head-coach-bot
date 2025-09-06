@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { BotCommand } from '../types/discord';
-import { orchestratorApi } from '../services/orchestratorApi';
-import { userService } from '../services/userService';
+import { yahooAuth } from '../services/yahooAuth';
+import { yahooApi } from '../services/yahooApi';
 import { authLogger } from '../utils/logger';
 import { env } from '../utils/config';
 
@@ -66,33 +66,7 @@ export const authCommand: BotCommand = {
   },
 };
 
-async function generateFallbackAuthUrl(discordId: string): Promise<string> {
-  // Fallback OAuth URL generation when orchestrator is unavailable
-  // This uses a simple state token that the orchestrator can handle
-  const yahooClientId = process.env.YAHOO_CLIENT_ID;
-  const redirectUri = process.env.YAHOO_REDIRECT_URI;
-  
-  if (!yahooClientId || !redirectUri) {
-    throw new Error('Yahoo OAuth configuration missing (YAHOO_CLIENT_ID or YAHOO_REDIRECT_URI)');
-  }
-  
-  // Create a simple state token that includes the Discord ID and timestamp
-  // This is a temporary fallback - the orchestrator will need to handle this format
-  const fallbackState = Buffer.from(JSON.stringify({ 
-    discordId, 
-    timestamp: Date.now(),
-    fallback: true 
-  })).toString('base64url');
-  
-  const authUrl = `https://api.login.yahoo.com/oauth2/request_auth?` +
-    `client_id=${encodeURIComponent(yahooClientId)}&` +
-    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-    `response_type=code&` +
-    `scope=fspt-w&` +
-    `state=${encodeURIComponent(fallbackState)}`;
-  
-  return authUrl;
-}
+// This function is no longer needed as we handle OAuth directly
 
 async function handleLogin(
   interaction: ChatInputCommandInteraction,
@@ -105,65 +79,39 @@ async function handleLogin(
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     }
 
-    // Check orchestrator health first
-    authLogger.info({ discordId }, 'Checking orchestrator health before OAuth session creation');
-    const healthResult = await orchestratorApi.healthCheck();
-    
-    let authUrl: string;
-    let showFallbackWarning = false;
-    
-    if (healthResult.healthy) {
-      // Use orchestrator to create proper OAuth session with JWT state
-      authLogger.info({ discordId }, 'Creating OAuth session via orchestrator');
-      try {
-        authUrl = await orchestratorApi.createOAuthSession(discordId);
-        authLogger.info({ discordId, authUrlGenerated: !!authUrl }, 'OAuth session created successfully');
-      } catch (sessionError) {
-        authLogger.error({ error: sessionError, discordId }, 'Failed to create OAuth session via orchestrator, falling back to direct URL');
-        authUrl = await generateFallbackAuthUrl(discordId);
-        showFallbackWarning = true;
-      }
-    } else {
-      // Fallback: Generate OAuth URL directly (will need manual state validation fix)
-      authLogger.warn({ 
-        discordId, 
-        healthDetails: healthResult.details?.status || 'unknown',
-        databaseConnected: healthResult.details?.database?.connected || false,
-      }, 'Orchestrator health check failed, using fallback OAuth URL generation');
-      
-      authUrl = await generateFallbackAuthUrl(discordId);
-      showFallbackWarning = true;
-    }
+    // Generate OAuth URL directly using our new auth service
+    authLogger.info({ discordId }, 'Generating OAuth URL for Discord user');
+    const authUrl = yahooAuth.generateAuthUrl(discordId);
     
     const embed = new EmbedBuilder()
-      .setTitle('Connect Yahoo Fantasy Football')
-      .setDescription(`Authorize the bot to access your Yahoo Fantasy data. You can revoke access at any time in Yahoo settings.
-      
-⏰ **Important:** Click the link immediately and complete the process within 1-2 minutes to avoid authorization expiration.`)
+      .setTitle('🏈 Connect Yahoo Fantasy Football')
+      .setDescription(
+        '**Authorize HeadCoach to access your Yahoo Fantasy data**\n\n' +
+        '• Click the button below to connect your Yahoo account\n' +
+        '• You\'ll be redirected to Yahoo for secure login\n' +
+        '• After authorization, return here and check your status\n\n' +
+        '*You can revoke access anytime in your Yahoo account settings*'
+      )
       .setColor(0x430297);
 
-    if (showFallbackWarning) {
-      embed.addFields({
-        name: '⚠️ Notice',
-        value: 'Using backup authentication method due to service connectivity issues. If authentication fails, please try again in a few minutes.',
-        inline: false
-      });
-    }
-
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setLabel('Authorize with Yahoo').setStyle(ButtonStyle.Link).setURL(authUrl),
-      new ButtonBuilder().setCustomId('auth:status').setLabel('Check Status').setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder()
+        .setLabel('🔗 Authorize with Yahoo')
+        .setStyle(ButtonStyle.Link)
+        .setURL(authUrl),
+      new ButtonBuilder()
+        .setCustomId('auth:status')
+        .setLabel('📊 Check Status')
+        .setStyle(ButtonStyle.Secondary)
     );
 
-    const payload = { embeds: [embed], components: [row] } as const;
-
     // Since we deferred, always use editReply
-    await interaction.editReply(payload as any);
+    await interaction.editReply({ 
+      embeds: [embed], 
+      components: [row] 
+    });
 
-    // Background user sync (no additional messages)
-    userService
-      .createOrUpdateUser(discordId, discordUsername)
-      .catch((err) => authLogger.warn({ err, discordId }, 'User upsert failed post-link display'));
+    authLogger.info({ discordId }, 'Auth URL generated and sent to user');
   } catch (error) {
     authLogger.error({ error, discordId }, 'Failed to generate auth URL');
     const errorMessage = '❌ Failed to generate authentication link. Please try again later.';
@@ -186,64 +134,43 @@ async function handleStatus(interaction: ChatInputCommandInteraction, discordId:
       await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
     }
 
-    // Check if Discord bot has database access
-    const databaseUrl = process.env.DATABASE_URL;
-    if (!databaseUrl) {
-      const embed = new EmbedBuilder()
-        .setTitle('⚠️ Configuration Issue')
-        .setDescription(
-          '❌ **Database Connection Missing**\n\n' +
-          'The Discord bot cannot access the database where authentication tokens are stored.\n' +
-          'This means authentication status cannot be properly checked.\n\n' +
-          '🔧 **Admin Action Required:**\n' +
-          '• Set `DATABASE_URL` environment variable for the Discord bot\n' +
-          '• Use the same database URL as the orchestrator service\n\n' +
-          '💡 **Temporary Workaround:**\n' +
-          'Authentication may still work - try using other fantasy commands to test.'
-        )
-        .setColor(0xff9900);
-
-      await interaction.editReply({ embeds: [embed] });
-      return;
-    }
-
-    // Ensure user exists in our system (happens quickly in background)
-    userService.createOrUpdateUser(discordId, discordUsername).catch(error => {
-      authLogger.warn({ error, discordId }, 'User creation failed but continuing with status check');
-    });
-
-    const user = await userService.getUser(discordId);
-    const isAuth = await userService.isAuthenticated(discordId);
+    // Check authentication status using our new auth service
+    const isAuth = await yahooAuth.isAuthenticated(discordId);
+    const token = await yahooAuth.getToken(discordId);
 
     let statusDescription: string;
     let statusColor: number;
 
-    if (isAuth && user?.yahooUserId) {
-      // Double-check with orchestrator using Discord ID
-      const oauthStatus = await orchestratorApi.checkOAuthStatus(discordId);
+    if (isAuth && token) {
+      // Try to get user's leagues to verify the connection works
+      const leaguesResult = await yahooApi.getUserLeagues(discordId);
       
-      if (oauthStatus.authenticated) {
+      if (leaguesResult.success && leaguesResult.data) {
+        const leagueCount = leaguesResult.data.length;
         statusDescription = 
           '✅ **Connected to Yahoo Fantasy Football**\n\n' +
-          `**Account:** ${oauthStatus.userInfo?.name || 'Connected'}\n` +
-          `**Yahoo ID:** \`${user.yahooUserId}\`\n` +
-          `**Connected:** ${user.createdAt.toLocaleDateString()}\n\n` +
-          'You can now use fantasy football commands!';
+          `**Status:** Active and working\n` +
+          `**Leagues Found:** ${leagueCount} league${leagueCount !== 1 ? 's' : ''}\n` +
+          `**Connected:** ${token.createdAt.toLocaleDateString()}\n` +
+          `**Token Expires:** ${token.expiresAt.toLocaleDateString()}\n\n` +
+          'You can now use fantasy football commands like `/leagues`, `/standings`, and `/roster`!';
         statusColor = 0x00ff00;
       } else {
         statusDescription = 
-          '⚠️ **Authentication Expired**\n\n' +
-          'Your Yahoo connection has expired. Use `/auth login` to reconnect.';
+          '⚠️ **Connection Issues**\n\n' +
+          'Your Yahoo connection exists but there may be an issue accessing your data.\n' +
+          'Try using `/auth logout` and then `/auth login` to reconnect.';
         statusColor = 0xff9900;
-        
-        // Update our records
-        await userService.unlinkYahooAccount(discordId);
       }
     } else {
       statusDescription = 
         '❌ **Not Connected**\n\n' +
-        'You haven\'t connected your Yahoo Fantasy Football account yet.\n' +
-        'Use `/auth login` to get started!';
+        'You haven\'t connected your Yahoo Fantasy Football account yet.\n\n' +
+        '**To get started:**\n' +
+        '1️⃣ Use `/auth login` to connect your account\n' +
+        '2️⃣ Authorize HeadCoach in your browser\n' +
+        '3️⃣ Return here and use `/auth status` to verify\n\n' +
+        '*Then try commands like `/leagues` to see your fantasy teams!*';
       statusColor = 0xff0000;
     }
 
@@ -270,12 +197,7 @@ async function handleLogout(interaction: ChatInputCommandInteraction, discordId:
       await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
     }
 
-    // Ensure user exists in our system (happens quickly in background)
-    userService.createOrUpdateUser(discordId, discordUsername).catch(error => {
-      authLogger.warn({ error, discordId }, 'User creation failed but continuing with logout');
-    });
-
-    const isAuth = await userService.isAuthenticated(discordId);
+    const isAuth = await yahooAuth.isAuthenticated(discordId);
     
     if (!isAuth) {
       if (interaction.deferred || interaction.replied) {
@@ -286,25 +208,32 @@ async function handleLogout(interaction: ChatInputCommandInteraction, discordId:
       return;
     }
 
-    // Unlink the account
-    await userService.unlinkYahooAccount(discordId);
+    // Remove the stored token and clear cache
+    const success = await yahooAuth.removeToken(discordId);
+    yahooApi.clearUserCache(discordId);
 
-    const embed = new EmbedBuilder()
-      .setTitle('🔓 Account Disconnected')
-      .setDescription(
-        '✅ Your Yahoo Fantasy Football account has been disconnected.\n\n' +
-        'Your Discord account is no longer linked to Yahoo Fantasy Football.\n' +
-        'Use `/auth login` if you want to reconnect later.'
-      )
-      .setColor(0x808080);
+    if (success) {
+      const embed = new EmbedBuilder()
+        .setTitle('🔓 Account Disconnected')
+        .setDescription(
+          '✅ **Your Yahoo Fantasy Football account has been disconnected.**\n\n' +
+          '• All stored authentication tokens have been removed\n' +
+          '• Your cached data has been cleared\n' +
+          '• Fantasy commands will no longer work until you reconnect\n\n' +
+          '*Use `/auth login` whenever you want to reconnect your account.*'
+        )
+        .setColor(0x808080);
 
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({ embeds: [embed] });
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ embeds: [embed] });
+      } else {
+        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      }
+
+      authLogger.info({ discordId }, 'User successfully disconnected Yahoo account');
     } else {
-      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      throw new Error('Failed to remove authentication token');
     }
-
-    authLogger.info({ discordId }, 'User disconnected Yahoo account');
   } catch (error) {
     authLogger.error({ error, discordId }, 'Failed to logout user');
     throw error; // Let main handler deal with responses

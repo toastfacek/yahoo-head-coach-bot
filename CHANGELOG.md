@@ -122,53 +122,115 @@ With the Discord OAuth flow implementation complete and validated by E2E tests, 
 
 The Discord OAuth flow refactor is **production-ready** and provides a solid foundation for building the core fantasy football management features.
 
-### Discord Bot User ID Consistency Fix (January 2025)
-**Critical Fix**: Resolved systematic user ID inconsistency causing authentication failures in fantasy football commands.
+## [2025-01-06] - Discord Bot Authentication & Feature Overhaul
 
-**Root Cause Identified:**
-The Discord bot was inconsistently passing different user ID types to orchestrator API endpoints:
-- ✅ OAuth endpoints (`checkOAuthStatus`, `createOAuthSession`) correctly used Discord IDs
-- ❌ Fantasy endpoints (`getUserLeagues`, `checkLineup`, `approveRecommendation`, etc.) incorrectly used internal user IDs
+### Major Architecture Change: Direct OAuth in Discord Bot
+**BREAKING CHANGE**: Moved from complex Discord bot → Orchestrator → Database OAuth flow to direct authentication within Discord bot process, following Harambot's proven pattern.
 
-**The Problem:**
-All orchestrator API endpoints are designed to accept Discord IDs and handle internal user mapping via:
-```typescript
-const map = await prisma.discordUser.findUnique({ where: { discordId: rawUserId } });
-const userId = map?.userId || rawUserId;
+**Problem Solved**: The original multi-service OAuth architecture was causing state management issues, token refresh race conditions, and authentication failures. By analyzing the successful Harambot implementation, we identified that direct OAuth handling eliminates coordination complexity.
+
+### New Authentication System ✅
+- **Direct Yahoo OAuth**: `apps/discord-bot/src/services/yahooAuth.ts` - handles complete OAuth flow within Discord bot
+- **Encrypted Token Storage**: AES-256-GCM encryption with secure key derivation for Yahoo API tokens
+- **Automatic Token Refresh**: Built-in refresh logic with proper error handling and database persistence
+- **OAuth Callback Server**: `apps/discord-bot/src/services/oauthServer.ts` - simple Express server for OAuth callbacks (port 3001)
+- **User-Based Authentication**: Per-user token storage (vs Harambot's per-guild approach) for better flexibility
+
+### Enhanced Yahoo API Integration ✅
+- **Direct Yahoo API Service**: `apps/discord-bot/src/services/yahooApi.ts` - custom Yahoo Fantasy API client
+- **Complex Response Parsing**: Handles Yahoo's nested JSON structures correctly
+- **TTL Caching**: 5-minute cache for API responses to improve performance and reduce API calls
+- **Error Resilience**: Comprehensive error handling with user-friendly Discord responses
+
+### New Discord Commands ✅
+
+#### `/player` - Advanced Player Stats with Autocomplete 🔥
+- **Real-time Player Search**: Start typing player names, get instant autocomplete suggestions from Yahoo API
+- **Rich Player Information**: 
+  - Player photos, team logos, position, uniform numbers
+  - Season stats vs weekly stats (use `week:` parameter)
+  - Player ownership information when league context provided
+  - Bye week information and team details
+- **Smart Stat Display**: Prioritizes fantasy-relevant stats, filters zero values
+- **League Context**: Optional league parameter for ownership information
+
+#### `/matchups` - Live Matchup Previews 🔥
+- **Live Scoring**: Real-time score updates during games
+- **Win Probability**: Percentage chance of victory for each team
+- **Projection Tracking**: Projected vs actual scores
+- **Game Progress**: Remaining/live/completed games tracking
+- **Current Week Auto-Detection**: Automatically shows current week if not specified
+- **Multi-League Support**: Works across all user's leagues
+
+### Enhanced Existing Commands ✅
+- **`/leagues`** - Shows all user's Yahoo Fantasy leagues with season info
+- **`/standings`** - League standings with win-loss records or points
+- **`/myteam`** - User's roster organized by position
+- **`/auth login`** - Updated to use direct OAuth (no orchestrator dependency)
+- **`/auth status`** - Enhanced with real data verification and league count
+- **`/auth logout`** - Secure token removal with cache clearing
+
+### Technical Infrastructure ✅
+- **Autocomplete Support**: Full Discord autocomplete interaction handling across all commands
+- **Enhanced TypeScript Types**: Updated interfaces to support autocomplete interactions
+- **User-Specific Caching**: Cache keys tied to Discord user IDs for multi-user support
+- **Production Logging**: Structured logging with execution IDs and user context
+- **Environment Configuration**: Added Yahoo OAuth and encryption key environment variables
+
+### Files Added/Modified
+**New Core Services:**
+- `apps/discord-bot/src/services/yahooAuth.ts` - Complete OAuth and token management
+- `apps/discord-bot/src/services/yahooApi.ts` - Yahoo Fantasy API integration with caching
+- `apps/discord-bot/src/services/oauthServer.ts` - OAuth callback handling server
+
+**New Commands:**
+- `apps/discord-bot/src/commands/player.ts` - Player stats with autocomplete
+- `apps/discord-bot/src/commands/matchups.ts` - Live matchup previews
+- `apps/discord-bot/src/commands/leagues.ts` - User's fantasy leagues
+- `apps/discord-bot/src/commands/standings.ts` - League standings
+- `apps/discord-bot/src/commands/myteam.ts` - User's team roster
+
+**Enhanced Infrastructure:**
+- `apps/discord-bot/src/types/discord.ts` - Added autocomplete interface
+- `apps/discord-bot/src/handlers/interactions.ts` - Autocomplete interaction handling
+- `apps/discord-bot/src/handlers/commands.ts` - New command registration
+- `apps/discord-bot/src/bot.ts` - OAuth server integration
+- `apps/discord-bot/src/utils/config.ts` - Yahoo OAuth environment variables
+
+### Environment Variables Required
+```bash
+# Yahoo OAuth (from Yahoo Developer Network)
+YAHOO_CLIENT_ID=your_yahoo_client_id
+YAHOO_CLIENT_SECRET=your_yahoo_client_secret  
+YAHOO_REDIRECT_URI=http://localhost:3001/oauth/callback
+
+# Token encryption
+ENCRYPTION_KEY=your_secure_32_character_key
+
+# Existing Discord variables
+DISCORD_TOKEN=your_discord_token
+DATABASE_URL=your_database_url
 ```
 
-But the Discord bot was calling `userService.getYahooUserId(discordId)` to get internal user IDs, then passing those to endpoints that expected Discord IDs, causing mapping failures.
+### Key Improvements Over Original System
+1. **Simplified Architecture**: Eliminated complex multi-service coordination
+2. **Better User Experience**: Autocomplete, rich embeds, live data updates
+3. **Enhanced Security**: Encrypted token storage with proper key derivation
+4. **Improved Reliability**: Direct API calls without orchestrator dependency
+5. **User-Centric Design**: Per-user authentication vs per-server (more flexible)
+6. **Real Fantasy Value**: Actual useful commands for fantasy football management
 
-**Systematic Fix Applied:**
-Updated **7 files** across the Discord bot codebase to consistently pass `discordId` to all orchestrator API calls:
+### Compatibility Notes
+- **Breaking Change**: Old OAuth flow through orchestrator no longer supported
+- **Database Schema**: Uses existing `YahooToken` table with user-based storage
+- **Command Structure**: Maintains existing command patterns while adding new functionality
+- **Environment**: Requires additional Yahoo OAuth environment variables
 
-**Files Updated:**
-- `apps/discord-bot/src/commands/lineup.ts` - Lineup analysis command
-- `apps/discord-bot/src/commands/waivers.ts` - Waiver wire analysis command  
-- `apps/discord-bot/src/commands/approvals.ts` - Pending recommendations management
-- `apps/discord-bot/src/commands/report.ts` - Daily fantasy report generation
-- `apps/discord-bot/src/handlers/interactions.ts` - Button interactions (approve/reject/details)
-- `apps/discord-bot/src/handlers/messages.ts` - Message processing and chat handlers
-- `apps/discord-bot/src/services/scheduler.ts` - Automated daily reports and notifications
+### Testing
+1. Start Discord bot: `npm run dev` from `apps/discord-bot/`
+2. Use `/auth login` to authenticate with Yahoo
+3. Try `/player` with autocomplete for player search
+4. Use `/matchups` to see live league scoring
+5. All commands work with user's actual Yahoo Fantasy data
 
-**Pattern Changed:**
-```typescript
-// Before (Inconsistent & Broken):
-let yahooUserId = await userService.getYahooUserId(discordId);
-if (!yahooUserId) return; // Error handling
-await orchestratorApi.getUserLeagues(yahooUserId); // Wrong ID type
-
-// After (Consistent & Working):  
-await orchestratorApi.getUserLeagues(discordId); // Correct ID type
-```
-
-**Impact:**
-- ✅ Fixed `/lineup`, `/waivers`, `/approvals`, `/report` commands
-- ✅ Fixed approve/reject/details button interactions  
-- ✅ Fixed message-based fantasy queries and chat
-- ✅ Fixed scheduled daily reports and notifications
-- ✅ Simplified authentication flow by removing unnecessary ID lookups
-- ✅ Improved debugging with enhanced OAuth status logging
-
-**Testing:**
-The OAuth callback flow was already working (tokens stored successfully), but status checks and fantasy operations were failing due to this ID mapping mismatch. This fix resolves the "Failed to check OAuth status" errors seen in production logs.
+This overhaul transforms the Discord bot from a broken authentication system into a fully functional fantasy football management tool with rich interactive features adapted from Harambot's proven approach.

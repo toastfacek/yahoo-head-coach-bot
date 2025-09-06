@@ -1,4 +1,4 @@
-import { Interaction, ChatInputCommandInteraction, ButtonInteraction, EmbedBuilder, MessageFlags } from 'discord.js';
+import { Interaction, ChatInputCommandInteraction, ButtonInteraction, EmbedBuilder, MessageFlags, AutocompleteInteraction } from 'discord.js';
 import { ExtendedClient } from '../types/discord';
 import { discordLogger } from '../utils/logger';
 import { userService } from '../services/userService';
@@ -22,6 +22,8 @@ export async function handleInteraction(client: ExtendedClient, interaction: Int
     if (interaction.isChatInputCommand()) {
       discordLogger.info({ executionId, interactionId: interaction.id }, 'ULTRATHINK: Routing to handleSlashCommand');
       await handleSlashCommand(client, interaction);
+    } else if (interaction.isAutocomplete()) {
+      await handleAutocomplete(client, interaction);
     } else if (interaction.isButton()) {
       await handleButtonInteraction(client, interaction);
     } else if (interaction.isStringSelectMenu()) {
@@ -91,6 +93,40 @@ async function handleSlashCommand(client: ExtendedClient, interaction: ChatInput
   }, 'Executing slash command');
 
   await command.execute(interaction);
+}
+
+async function handleAutocomplete(client: ExtendedClient, interaction: AutocompleteInteraction) {
+  const command = client.commands.get(interaction.commandName);
+  
+  discordLogger.info({
+    commandName: interaction.commandName,
+    userId: interaction.user.id,
+    username: interaction.user.username,
+    focusedOption: interaction.options.getFocused(true)
+  }, 'Handling autocomplete interaction');
+  
+  if (!command || !command.autocomplete) {
+    discordLogger.warn({ commandName: interaction.commandName }, 'Autocomplete handler not found');
+    await interaction.respond([]);
+    return;
+  }
+
+  try {
+    await command.autocomplete(interaction);
+  } catch (error) {
+    discordLogger.error({ 
+      error, 
+      commandName: interaction.commandName, 
+      userId: interaction.user.id 
+    }, 'Error in autocomplete handler');
+    
+    // Always respond to autocomplete, even on error
+    try {
+      await interaction.respond([]);
+    } catch (respondError) {
+      discordLogger.error({ respondError }, 'Failed to respond to autocomplete after error');
+    }
+  }
 }
 
 async function handleButtonInteraction(client: ExtendedClient, interaction: ButtonInteraction) {

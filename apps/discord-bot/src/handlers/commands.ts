@@ -6,6 +6,11 @@ import { waiversCommand } from '../commands/waivers';
 import { reportCommand } from '../commands/report';
 import { approvalsCommand } from '../commands/approvals';
 import { listCommand } from '../commands/list';
+import { leaguesCommand } from '../commands/leagues';
+import { standingsCommand } from '../commands/standings';
+import { myteamCommand } from '../commands/myteam';
+import { playerCommand } from '../commands/player';
+import { matchupsCommand } from '../commands/matchups';
 
 export function loadCommands(): Collection<string, BotCommand> {
   const commands = new Collection<string, BotCommand>();
@@ -17,6 +22,13 @@ export function loadCommands(): Collection<string, BotCommand> {
   commands.set(reportCommand.data.name, reportCommand);
   commands.set(approvalsCommand.data.name, approvalsCommand);
   commands.set(listCommand.data.name, listCommand);
+  
+  // New Yahoo API direct commands
+  commands.set(leaguesCommand.data.name, leaguesCommand);
+  commands.set(standingsCommand.data.name, standingsCommand);
+  commands.set(myteamCommand.data.name, myteamCommand);
+  commands.set(playerCommand.data.name, playerCommand);
+  commands.set(matchupsCommand.data.name, matchupsCommand);
 
   return commands;
 }

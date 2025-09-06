@@ -2,8 +2,7 @@ import { Client, GatewayIntentBits, Partials, Collection } from 'discord.js';
 import { ExtendedClient, BotCommand, BotButton } from './types/discord';
 import { env, discordConfig } from './utils/config';
 import { discordLogger } from './utils/logger';
-import { orchestratorApi } from './services/orchestratorApi';
-import { userService } from './services/userService';
+import { oauthServer } from './services/oauthServer';
 import { loadCommands } from './handlers/commands';
 import { handleInteraction } from './handlers/interactions';
 import { handleMessage } from './handlers/messages';
@@ -33,19 +32,19 @@ async function initializeBot() {
     // Start lightweight HTTP server for platform healthchecks
     startHealthServer();
 
+    // Start OAuth callback server
+    try {
+      await oauthServer.start();
+      discordLogger.info('OAuth callback server started');
+    } catch (error) {
+      discordLogger.warn({ error }, 'Failed to start OAuth server - authentication may not work properly');
+    }
+
     // Load commands
     const commands = loadCommands();
     client.commands = commands;
     
     discordLogger.info(`Loaded ${commands.size} slash commands`);
-
-    // Check orchestrator health
-    const isHealthy = await orchestratorApi.healthCheck();
-    if (!isHealthy) {
-      discordLogger.warn('Orchestrator API health check failed - some features may not work');
-    } else {
-      discordLogger.info('Orchestrator API is healthy');
-    }
 
     // Register event handlers
     registerEventHandlers();
@@ -129,14 +128,19 @@ async function cleanup() {
   try {
     discordLogger.info('Cleaning up resources...');
     
+    // Stop OAuth server
+    try {
+      await oauthServer.stop();
+      discordLogger.info('OAuth server stopped');
+    } catch (error) {
+      discordLogger.warn({ error }, 'Error stopping OAuth server');
+    }
+    
     // Cleanup scheduler
     const { schedulerService } = await import('./services/scheduler');
     if (schedulerService) {
       schedulerService.destroy();
     }
-    
-    // Cleanup user service
-    await userService.cleanup();
     
     // Destroy Discord client
     client.destroy();
