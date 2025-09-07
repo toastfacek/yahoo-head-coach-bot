@@ -28,36 +28,50 @@ client.commands = new Collection<string, BotCommand>();
 client.buttons = new Collection<string, BotButton>();
 
 async function initializeBot() {
+  console.log('🚀 Starting Discord bot initialization...');
+  
   try {
-    // Start lightweight HTTP server for platform healthchecks
+    // Start lightweight HTTP server for platform healthchecks FIRST
+    console.log('🏥 Starting health server...');
     startHealthServer();
+    console.log('✅ Health server started successfully');
 
     // Start OAuth callback server
+    console.log('🔐 Starting OAuth callback server...');
     try {
       await oauthServer.start();
+      console.log('✅ OAuth callback server started');
       discordLogger.info('OAuth callback server started');
     } catch (error) {
+      console.warn('⚠️ Failed to start OAuth server:', error);
       discordLogger.warn({ error }, 'Failed to start OAuth server - authentication may not work properly');
     }
 
     // Load commands
+    console.log('📋 Loading Discord commands...');
     const commands = loadCommands();
     client.commands = commands;
-    
+    console.log(`✅ Loaded ${commands.size} slash commands`);
     discordLogger.info(`Loaded ${commands.size} slash commands`);
 
     // Register event handlers
+    console.log('🔧 Registering event handlers...');
     registerEventHandlers();
 
     // Login to Discord (if token present)
     if (!env.DISCORD_TOKEN) {
+      console.warn('⚠️ DISCORD_TOKEN is not set. Skipping Discord login; health endpoint will remain up.');
       discordLogger.warn('DISCORD_TOKEN is not set. Skipping Discord login; health endpoint will remain up.');
       return;
     }
+    
+    console.log('🤖 Connecting to Discord...');
     await client.login(env.DISCORD_TOKEN);
+    console.log('✅ Discord bot connected successfully');
     
   } catch (error) {
     // Do not exit the process so health endpoint stays up
+    console.error('❌ Failed to initialize bot; keeping process alive for healthchecks:', error);
     discordLogger.error(error, 'Failed to initialize bot; keeping process alive for healthchecks');
   }
 }

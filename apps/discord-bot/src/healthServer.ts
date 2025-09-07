@@ -6,8 +6,21 @@ export function startHealthServer() {
   const port = Number(process.env.PORT || process.env.DISCORD_HEALTH_PORT || 8081);
 
   // Simple health endpoints
-  app.get('/', (_req, res) => res.status(200).json({ status: 'ok', service: 'discord-bot' }));
-  app.get('/health', (_req, res) => res.status(200).json({ status: 'ok', service: 'discord-bot' }));
+  app.get('/', (_req, res) => res.status(200).json({ 
+    status: 'ok', 
+    service: 'discord-bot',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  }));
+  
+  app.get('/health', (_req, res) => res.status(200).json({ 
+    status: 'ok', 
+    service: 'discord-bot',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'unknown',
+    memory: process.memoryUsage()
+  }));
   
   // Add error handling middleware
   app.use((err: any, _req: any, res: any, _next: any) => {
