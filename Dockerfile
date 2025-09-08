@@ -23,8 +23,5 @@ EXPOSE 3000
 # Start selected service with ts-node to avoid build-time compilation
 # SERVICE=orchestrator -> API server (ts-node)
 # SERVICE=discord      -> Discord bot (ts-node)
-CMD ["sh", "-c", "case \"$SERVICE\" in \\
-  orchestrator) TS_NODE_PROJECT=apps/orchestrator/tsconfig.json node -r ts-node/register/transpile-only apps/orchestrator/src/server.ts ;; \\
-  discord) TS_NODE_PROJECT=apps/discord-bot/tsconfig.json node -r ts-node/register/transpile-only apps/discord-bot/src/bot.ts ;; \\
-  *) echo 'SERVICE not set, defaulting to orchestrator' && TS_NODE_PROJECT=apps/orchestrator/tsconfig.json node -r ts-node/register/transpile-only apps/orchestrator/src/server.ts ;; \\
-esac"]
+RUN chmod +x /app/docker-start.sh
+CMD ["sh", "/app/docker-start.sh"]
