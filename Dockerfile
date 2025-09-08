@@ -24,4 +24,4 @@ EXPOSE 3000
 # SERVICE=orchestrator -> API server (ts-node)
 # SERVICE=discord      -> Discord bot (ts-node)
 RUN chmod +x /app/docker-start.sh
-CMD ["sh", "/app/docker-start.sh"]
+ENTRYPOINT ["sh", "/app/docker-start.sh"]
