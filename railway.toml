@@ -4,8 +4,8 @@ builder = "nixpacks"
 buildCommand = "npm install --production=false && npx prisma generate --schema=packages/data/prisma/schema.prisma"
 
 [deploy]
-# Run via ts-node in transpile-only mode to avoid typecheck build failures
-startCommand = "TS_NODE_PROJECT=apps/discord-bot/tsconfig.json node -r ts-node/register/transpile-only apps/discord-bot/src/bot.ts"
+# Delegate startup to the Docker entrypoint script so Docker and Railway configs stay in sync
+startCommand = "sh /app/docker-start.sh"
 healthcheckPath = "/health"
 restartPolicyType = "always"
 
