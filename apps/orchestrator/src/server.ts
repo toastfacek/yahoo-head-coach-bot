@@ -14,6 +14,7 @@ import { env, allowedOrigins } from './config/env';
 import { connectDatabase, getDatabaseHealth, disconnectDatabase } from './db';
 console.log('🔄 Importing routes...');
 import router from './routes';
+import { healthCheck } from './routes/health';
 console.log('✅ Routes imported successfully');
 
 const app = express();
@@ -53,6 +54,9 @@ app.use('/api/approvals', limiter);
 // API routes
 console.log('🔄 Loading API routes...');
 try {
+  // Root-level health endpoint for platform healthchecks (e.g., Railway default /health)
+  app.get('/health', healthCheck);
+
   app.use('/api', router);
   console.log('✅ API routes loaded successfully');
 } catch (error) {
