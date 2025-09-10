@@ -104,20 +104,27 @@ export async function oauthCallback(req: Request, res: Response): Promise<void> 
 
       // Try fallback state format first (base64url encoded JSON)
       try {
-        const fallbackData = JSON.parse(Buffer.from(String(state), 'base64url').toString());
-        if (fallbackData.fallback === true && fallbackData.discordId) {
-          console.log('[oauth-callback] Using fallback state format:', {
-            discordId: fallbackData.discordId,
+        const parsedJson = Buffer.from(String(state), 'base64url').toString();
+        const fallbackData = JSON.parse(parsedJson);
+
+        // Accept multiple shapes:
+        //  - { fallback: true, discordId: "..." }
+        //  - { discordUserId: "...", timestamp, nonce } (Discord bot direct link)
+        const rawDiscordId = fallbackData.discordId || fallbackData.discordUserId;
+
+        if (rawDiscordId) {
+          console.log('[oauth-callback] Using fallback JSON state format:', {
+            hasFallbackFlag: !!fallbackData.fallback,
             timestamp: fallbackData.timestamp,
           });
-          discordId = String(fallbackData.discordId);
-          ensuredUserId = discordId; // For fallback, use Discord ID as user ID
+          discordId = String(rawDiscordId);
+          ensuredUserId = discordId; // Use Discord ID as user ID
           console.log('[oauth-callback] Fallback state validation successful', {
             discordId,
             ensuredUserId,
           });
         } else {
-          throw new Error('Not fallback format');
+          throw new Error('Not recognized fallback JSON');
         }
       } catch {
         // Fallback failed, try JWT format
