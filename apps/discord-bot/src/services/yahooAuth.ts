@@ -108,7 +108,8 @@ export class YahooAuthService {
   }
 
   /**
-   * Store encrypted token in database
+   * Store token in database (plaintext for cross-service compatibility)
+   * Note: Orchestrator stores tokens plaintext. We keep the same format so both services can read them.
    */
   private async storeToken(discordUserId: string, tokenData: YahooTokenData): Promise<void> {
     const { PrismaClient } = await import('@prisma/client');
@@ -117,15 +118,11 @@ export class YahooAuthService {
     try {
       const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
       
-      // Encrypt sensitive data
-      const encryptedAccessToken = this.encrypt(tokenData.access_token);
-      const encryptedRefreshToken = this.encrypt(tokenData.refresh_token);
-
       await prisma.yahooToken.upsert({
         where: { userId: discordUserId },
         update: {
-          accessToken: encryptedAccessToken,
-          refreshToken: encryptedRefreshToken,
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token,
           expiresAt: expiresAt,
           tokenType: tokenData.token_type,
           scope: tokenData.scope,
@@ -134,8 +131,8 @@ export class YahooAuthService {
         },
         create: {
           userId: discordUserId,
-          accessToken: encryptedAccessToken,
-          refreshToken: encryptedRefreshToken,
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token,
           expiresAt: expiresAt,
           tokenType: tokenData.token_type,
           scope: tokenData.scope,
@@ -165,14 +162,10 @@ export class YahooAuthService {
         return null;
       }
 
-      // Decrypt sensitive data
-      const decryptedAccessToken = this.decrypt(tokenRecord.accessToken);
-      const decryptedRefreshToken = this.decrypt(tokenRecord.refreshToken);
-
       return {
         userId: tokenRecord.userId,
-        accessToken: decryptedAccessToken,
-        refreshToken: decryptedRefreshToken,
+        accessToken: tokenRecord.accessToken,
+        refreshToken: tokenRecord.refreshToken,
         expiresAt: tokenRecord.expiresAt,
         tokenType: tokenRecord.tokenType,
         scope: tokenRecord.scope || undefined,
@@ -213,7 +206,7 @@ export class YahooAuthService {
 
       const tokenData: YahooTokenData = response.data;
       
-      // Store the refreshed token
+      // Store the refreshed token (plaintext)
       await this.storeToken(discordUserId, tokenData);
       
       authLogger.info({ discordUserId }, 'Successfully refreshed Yahoo token');
